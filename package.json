@@ -6,9 +6,12 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "copy-rr-contract-abi": "npx copyfiles -u 3 contracts/out/RequestAndResponse.sol/RequestResponseConsumer.json lib/abis/",
+    "forge:build": "cd contracts && forge build && npm run copy-rr-contract-abi"
   },
   "dependencies": {
+    "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@rainbow-me/rainbowkit": "^2.2.4",
     "@tanstack/react-query": "^5.72.2",

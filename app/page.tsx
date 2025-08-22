@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import Link from "next/link";
 import { useAccount } from "wagmi";
 
 // Shadcn UI 컴포넌트 임포트
@@ -37,7 +38,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-br from-primary-purple to-secondary-purple font-sans text-gray-800">
-      <div className="absolute top-8 right-8 z-10">
+      <div className="absolute top-8 right-8 z-10 flex items-center gap-4">
+        <Link href="/dev">
+          <Button variant="outline">Dev Page</Button>
+        </Link>
         <ConnectButton />
       </div>
       <div className="container mx-auto max-w-7xl">
