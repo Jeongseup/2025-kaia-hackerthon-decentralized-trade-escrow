@@ -190,7 +190,27 @@ contract DecentralizedTradeEscrowTest is Test {
         vm.stopPrank();
 
         vm.prank(address(mockCoordinator));
-        dte.rawFulfillDataRequest(requestId, 6);
+        dte.rawFulfillDataRequest(requestId, 3);
+
+        // Act: Buyer confirms delivery for enabling to withdraw.
+        vm.prank(buyer);
+        dte.confirmDelivery(tradeId);
+
+        (
+            ,
+            ,
+            ,
+            DecentralizedTradeEscrow.TradeStatus _statusCompleted,
+            ,
+            ,
+
+        ) = dte.trades(tradeId);
+
+        assertEq(
+            uint256(_statusCompleted),
+            uint256(DecentralizedTradeEscrow.TradeStatus.Completed),
+            "Trade status should be Completed by Buyer"
+        );
 
         // Act: Seller withdraws funds.
         vm.prank(seller);
@@ -203,9 +223,10 @@ contract DecentralizedTradeEscrowTest is Test {
 
         assertEq(
             uint256(_status),
-            uint256(DecentralizedTradeEscrow.TradeStatus.Completed),
-            "Trade status should be Completed"
+            uint256(DecentralizedTradeEscrow.TradeStatus.Withdrawn),
+            "Trade status should be Withdrawn by Seller"
         );
+
         assertEq(
             stableKRW.balanceOf(seller),
             DEFAULT_TRADE_AMOUNT,

@@ -22,13 +22,14 @@ contract DecentralizedTradeEscrow is
     using Orakl for Orakl.Request;
 
     enum TradeStatus {
-        Created, // 0: Trade created by buyer, awaiting deposit
-        Deposited, // 1: Buyer deposited funds
-        Shipping, // 2: Seller submitted tracking info, awaiting oracle confirmation
-        Delivered, // 3: Oracle confirmed delivery, awaiting buyer confirmation period
-        Completed, // 4: Seller has withdrawn funds or buyer was refunded
-        Canceled, // 5: Trade canceled before deposit or by seller after deposit
-        Disputed // 6: Buyer raised a dispute after delivery
+        Created, // 0: 거래 생성됨. 구매자의 입금 대기.
+        Deposited, // 1: 구매자가 입금 완료. 판매자의 송장 입력 대기.
+        Shipping, // 2: 판매자가 송장 입력. 오라클의 배송 완료 확인 대기.
+        Delivered, // 3: 오라클이 배송 완료 확인. 구매자의 '수령 확인' 또는 '분쟁 제기' 대기.
+        Completed, // 4: 구매자가 '수령 확인' 완료. 판매자의 즉시 인출 대기.
+        Withdrawn, // 5: 판매자가 정산 완료. (거래 최종 성공)
+        Canceled, // 6: 거래가 취소됨 (환불).
+        Disputed // 7: 구매자가 분쟁을 제기하여 관리자의 개입 대기.
     }
 
     struct Trade {
@@ -64,8 +65,9 @@ contract DecentralizedTradeEscrow is
         uint256 indexed requestId,
         string trackingNumber
     );
-    event TradeDelivered(uint256 indexed tradeId);
+    event TradeDelivered(uint256 indexed tradeId, uint256 timestamp);
     event TradeCompleted(uint256 indexed tradeId);
+    event TradeWithdrawn(uint256 indexed tradeId);
     event TradeCanceled(uint256 indexed tradeId, address indexed canceledBy);
     event TradeDisputed(uint256 indexed tradeId);
     event DisputeResolved(
@@ -247,36 +249,67 @@ contract DecentralizedTradeEscrow is
         emit TrackingInfoSubmitted(_tradeId, requestId, _trackingNumber);
     }
 
-    function withdraw(
-        uint256 _tradeId
-    ) external nonReentrant onlySeller(_tradeId) {
+    /**
+     * @notice 구매자가 상품을 정상적으로 수령했음을 확인하는 함수입니다.
+     * @dev 이 함수가 호출되면, 판매자는 분쟁 제기 기간을 기다릴 필요 없이 즉시 자금을 인출할 수 있습니다.
+     * @param _tradeId 수령을 확인할 거래의 ID입니다.
+     */
+    function confirmDelivery(uint256 _tradeId) external onlyBuyer(_tradeId) {
         Trade storage trade = trades[_tradeId];
-        require(
-            trade.status == TradeStatus.Completed,
-            "DTE: Trade not in Delivered state"
-        );
-        require(
-            block.timestamp >= trade.deliveredAt + disputePeriod,
-            "DTE: Dispute period has not ended"
-        );
-
-        trade.status = TradeStatus.Completed;
-        uint256 amount = trade.amount;
-
-        require(
-            STABLE_KRW_ADDRESS.transfer(trade.seller, amount),
-            "DTE: Token transfer failed"
-        );
-
-        emit TradeCompleted(_tradeId);
-    }
-
-    function raiseDispute(uint256 _tradeId) external onlyBuyer(_tradeId) {
-        Trade storage trade = trades[_tradeId];
+        // 오라클에 의해 '배송 완료' 상태일 때만 호출 가능합니다.
         require(
             trade.status == TradeStatus.Delivered,
             "DTE: Trade not in Delivered state"
         );
+
+        // 거래 상태를 'Completed'로 변경합니다.
+        trade.status = TradeStatus.Completed;
+        emit TradeCompleted(_tradeId);
+    }
+
+    /**
+     * @notice 판매자가 에스크로된 자금을 인출합니다.
+     * @dev 아래 두 가지 조건 중 하나를 만족하면 인출이 가능합니다:
+     * 1. 구매자가 수령 확인을 하여 거래 상태가 'Completed'가 된 경우 (즉시 인출 가능)
+     * 2. 거래 상태가 'Delivered'이고, 분쟁 제기 기간이 만료된 경우 (구매자 무응답 시)
+     * @param _tradeId 인출할 거래의 ID입니다.
+     */
+    function withdraw(
+        uint256 _tradeId
+    ) external nonReentrant onlySeller(_tradeId) {
+        Trade storage trade = trades[_tradeId];
+
+        // [핵심 로직]
+        // 조건 1: 구매자가 수령 확인을 했는가? (빠른 경로)
+        bool isCompletedByBuyer = trade.status == TradeStatus.Completed;
+        // 조건 2: 구매자가 응답이 없고, 분쟁 기간이 지났는가? (안전 경로)
+        bool isTimeout = (trade.status == TradeStatus.Delivered &&
+            block.timestamp >= trade.deliveredAt + disputePeriod);
+
+        require(
+            isCompletedByBuyer || isTimeout,
+            "DTE: Withdrawal conditions not met"
+        );
+
+        // 상태를 먼저 변경 (Checks-Effects-Interactions 패턴)
+        trade.status = TradeStatus.Withdrawn;
+
+        require(
+            STABLE_KRW_ADDRESS.transfer(trade.seller, trade.amount),
+            "DTE: Token transfer failed"
+        );
+
+        emit TradeWithdrawn(_tradeId);
+    }
+
+    function raiseDispute(uint256 _tradeId) external onlyBuyer(_tradeId) {
+        Trade storage trade = trades[_tradeId];
+        // 'Delivered' 상태일 때만 분쟁 제기가 가능합니다.
+        require(
+            trade.status == TradeStatus.Delivered,
+            "DTE: Can only dispute in Delivered state"
+        );
+        // 분쟁 제기 기간이 지나면 분쟁을 제기할 수 없습니다.
         require(
             block.timestamp < trade.deliveredAt + disputePeriod,
             "DTE: Dispute period is over"
@@ -329,15 +362,25 @@ contract DecentralizedTradeEscrow is
         uint128 _deliveryStatus
     ) internal override {
         uint256 tradeId = requestToTradeId[_requestId];
-        require(tradeId != 0, "DTE: Invalid request ID");
+        // 유효하지 않거나 이미 처리된 요청은 무시합니다.
+        if (tradeId == 0) {
+            return;
+        }
 
-        if (_deliveryStatus == 6) {
-            // Delivered
-            trades[tradeId].status = TradeStatus.Completed;
-            emit TradeDelivered(tradeId);
-            delete requestToTradeId[_requestId];
-        } else if (_deliveryStatus >= 3) {
+        // [요청사항 반영] deliveryStatus가 3보다 크면 (예: 배달준비, 배달완료)
+        if (_deliveryStatus >= 3) {
+            // 거래 상태를 'Delivered'로 변경합니다.
             trades[tradeId].status = TradeStatus.Delivered;
+
+            // [요청사항 반영] "오라클이 온체인에 배송 완료를 보고한 시점"을 블록 타임스탬프로 기록합니다.
+            // 이 타임스탬프가 분쟁 제기 기간과 인출 대기 시간의 기준이 됩니다.
+            trades[tradeId].deliveredAt = block.timestamp;
+
+            // TradeDelivered 이벤트를 발생시켜 외부에 알립니다.
+            emit TradeDelivered(tradeId, block.timestamp);
+
+            // 처리가 완료된 요청 ID는 매핑에서 삭제하여 재사용을 방지합니다.
+            delete requestToTradeId[_requestId];
         }
     }
 }
