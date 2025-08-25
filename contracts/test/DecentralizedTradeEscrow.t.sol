@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
 import {DecentralizedTradeEscrow} from "../src/DecentralizedTradeEscrow.sol";
 import {StableKRW} from "../src/tokens/StableKRW.sol"; // Assuming you have a mockable StableKRW
 import {MockCoordinator} from "./mocks/MockCoordinator.sol";
@@ -115,18 +116,23 @@ contract DecentralizedTradeEscrowTest is Test {
 
         // Assert: Verify the final state after deposit.
         (
-            address _buyer, 
+            address _buyer,
             address _seller,
             uint256 _amount,
             DecentralizedTradeEscrow.TradeStatus _status,
             ,
             ,
+
         ) = dte.trades(tradeId);
 
         // 1. Verify trade properties
         assertEq(_buyer, buyer, "Trade buyer should be the correct address");
         assertEq(_seller, seller, "Trade seller should be the correct address");
-        assertEq(_amount, DEFAULT_TRADE_AMOUNT, "Trade amount should be correct");
+        assertEq(
+            _amount,
+            DEFAULT_TRADE_AMOUNT,
+            "Trade amount should be correct"
+        );
         assertEq(
             uint256(_status),
             uint256(DecentralizedTradeEscrow.TradeStatus.Deposited),
@@ -143,6 +149,72 @@ contract DecentralizedTradeEscrowTest is Test {
             stableKRW.balanceOf(address(dte)),
             DEFAULT_TRADE_AMOUNT,
             "DTE contract's balance should increase by the trade amount"
+        );
+    }
+
+    /**
+     * @notice [Happy Path] Seller submits tracking info and oracle fulfills, changing status to Delivered.
+     */
+    function test_Success_SubmitTrackingAndFulfill() public {
+        // Arrange: A trade is created and funds are deposited.
+        uint256 tradeId = _createAndDepositTrade(DEFAULT_TRADE_AMOUNT);
+
+        // Act: Seller submits tracking info, and mock coordinator fulfills the request.
+        vm.startPrank(seller);
+        uint256 requestId = dte.submitTrackingInfo(1, "1234567890", 0, 100_000);
+        vm.stopPrank();
+
+        vm.prank(address(mockCoordinator));
+        dte.rawFulfillDataRequest(requestId, 3); // 3 represents '배송 완료'
+
+        // Assert: Trade status is now Delivered.
+        (, , , DecentralizedTradeEscrow.TradeStatus _status, , , ) = dte.trades(
+            tradeId
+        );
+        assertEq(
+            uint256(_status),
+            uint256(DecentralizedTradeEscrow.TradeStatus.Delivered),
+            "Trade status should be Delivered"
+        );
+    }
+
+    /**
+     * @notice [Happy Path] Seller successfully withdraws funds after the dispute period has passed.
+     */
+    function test_Success_Withdraw() public {
+        // Arrange: A trade is created and funds are deposited.
+        uint256 tradeId = _createAndDepositTrade(DEFAULT_TRADE_AMOUNT);
+
+        vm.startPrank(seller);
+        uint256 requestId = dte.submitTrackingInfo(1, "1234567890", 0, 100_000);
+        vm.stopPrank();
+
+        vm.prank(address(mockCoordinator));
+        dte.rawFulfillDataRequest(requestId, 6);
+
+        // Act: Seller withdraws funds.
+        vm.prank(seller);
+        dte.withdraw(tradeId);
+
+        // Assert: Seller's balance has increased, DTE's balance is zero, and trade is completed.
+        (, , , DecentralizedTradeEscrow.TradeStatus _status, , , ) = dte.trades(
+            tradeId
+        );
+
+        assertEq(
+            uint256(_status),
+            uint256(DecentralizedTradeEscrow.TradeStatus.Completed),
+            "Trade status should be Completed"
+        );
+        assertEq(
+            stableKRW.balanceOf(seller),
+            DEFAULT_TRADE_AMOUNT,
+            "Seller's balance should be credited"
+        );
+        assertEq(
+            stableKRW.balanceOf(address(dte)),
+            0,
+            "DTE contract balance should be zero"
         );
     }
 }
