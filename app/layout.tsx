@@ -9,8 +9,8 @@ import { Toaster } from "@/components/ui/sonner"; // Toaster import
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "DTE - Decentralized Trade Escrow",
-  description: "믿지 않아도 안전한 P2P 거래, DTE와 함께하세요.",
+  title: "Trustless Trade",
+  description: "Pay Trustless, Trade Real, 믿지 않아도 안전한 거래",
 };
 
 export default function RootLayout({

@@ -9,18 +9,17 @@ export const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navLinks = [
-    { href: "#", label: "서비스 소개" },
-    { href: "/demo", label: "데모 페이지" },
+    { href: "/#top", label: "서비스 소개" },
+    { href: "/#howitworks", label: "데모 슬라이더" },
     { href: "#", label: "API 문서" },
-    { href: "#", label: "요금제" },
-    { href: "#", label: "개발자 포털" },
+    { href: "https://orakl.network/", label: "연관 개발 문서" },
   ];
 
   return (
     <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50">
       <div className="container py-4 flex justify-between items-center">
         <Link href="/" className="text-2xl font-bold text-gray-800">
-          D<span className="text-primary-purple">T</span>E
+          Trustless<span className="text-primary-purple">Trade</span>
         </Link>
         
         {/* Desktop Navigation */}
@@ -32,11 +31,8 @@ export const Header = () => {
           ))}
         </nav>
         <div className="hidden md:flex items-center space-x-2">
-          <Button variant="ghost" asChild>
-            <Link href="#">로그인</Link>
-          </Button>
           <Button asChild className="bg-primary-purple hover:bg-primary-purple/90">
-            <Link href="#">연동 문의하기</Link>
+            <Link href="https://dorahacks.io/buidl/31830/">연동 문의하기</Link>
           </Button>
         </div>
 

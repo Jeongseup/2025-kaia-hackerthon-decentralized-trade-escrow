@@ -4,7 +4,7 @@ export const FeaturesSection = () => {
       <div className="container">
         <div className="text-center mb-12 md:mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800">신뢰를 구축하는 기술</h2>
-          <p className="text-gray-600 mt-2 max-w-2xl mx-auto">DTE는 블록체인 기술로 투명하고 안전한 거래 환경을 제공합니다.</p>
+          <p className="text-gray-600 mt-2 max-w-2xl mx-auto">Trustless Trade는 블록체인 기술로 투명하고 안전한 거래 환경을 제공합니다.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
           <div className="bg-gray-50 p-8 rounded-xl text-center hover:shadow-xl hover:-translate-y-2 transition-all">

@@ -16,7 +16,7 @@ const steps = [
   {
     buyer: () => <InitialView role="구매자" />,
     seller: () => <InitialView role="판매자" />,
-    description: "판매자가 DTE 서비스를 통해 새로운 거래를 생성하고, 거래 정보를 입력합니다."
+    description: "판매자가 Trustless Trade 서비스를 통해 새로운 거래를 생성하고, 거래 정보를 입력합니다."
   },
   {
     buyer: () => <TradeStatus status="대기 중" message="판매자가 거래를 생성하고 있습니다." />,
@@ -26,15 +26,15 @@ const steps = [
   {
     buyer: () => <DepositScreen />,
     seller: () => <TradeStatus status="입금 대기 중" message="구매자가 거래 대금을 에스크로에 입금하고 있습니다." />,
-    description: "판매자는 입금 내역을 확인하고 상품을 발송한 뒤, 송장 번호를 DTE에 입력합니다."
+    description: "판매자는 입금 내역을 확인하고 상품을 발송한 뒤, 송장 번호를 Trustless Trade에 입력합니다."
   },
   {
     buyer: () => <TradeStatus status="배송 준비 중" message="판매자가 상품을 준비하고 송장 번호를 입력할 예정입니다." />,
     seller: () => <EnterTrackingNumber />,
-    description: "DTE 오라클이 입력된 송장 번호를 통해 실제 배송 상태를 주기적으로 확인합니다."
+    description: "Trustless Trade 오라클이 입력된 송장 번호를 통해 실제 배송 상태를 주기적으로 확인합니다."
   },
   {
-    buyer: () => <TradeStatus status="배송 중" message="상품이 배송되고 있습니다. DTE가 배송 상태를 추적합니다." />,
+    buyer: () => <TradeStatus status="배송 중" message="상품이 배송되고 있습니다. Trustless Trade가 배송 상태를 추적합니다." />,
     seller: () => <TradeStatus status="배송 중" message="송장 번호가 확인되었습니다. 배송이 완료되면 자동 정산됩니다." />,
     description: "배송이 완료되고 구매자의 이의 제기가 없으면, 스마트 컨트랙트가 판매자에게 대금을 자동으로 정산합니다."
   },
@@ -49,7 +49,7 @@ const steps = [
 const InitialView = ({ role }: { role: string }) => (
     <div className="p-6 text-center">
         <h2 className="font-bold text-lg mb-2">{role} 화면</h2>
-        <p className="text-sm text-gray-500">DTE 데모 화면입니다.</p>
+        <p className="text-sm text-gray-500">Trustless Trade 데모 화면입니다.</p>
         <div className="mt-8">
             <div className="bg-gray-200 h-32 rounded-lg"></div>
             <div className="bg-gray-200 h-8 mt-4 rounded-lg"></div>
@@ -120,10 +120,10 @@ export const AutoDemoSlider = () => {
     const SellerComponent = steps[currentStep].seller;
 
     return (
-        <section className="bg-gradient-to-br from-primary-purple to-secondary-purple py-16 md:py-20 lg:py-24">
+        <section id="howitworks" className="bg-gradient-to-br from-primary-purple to-secondary-purple py-16 md:py-20 lg:py-24">
             <div className="container">
                 <div className="text-center mb-8 md:mb-12 text-white">
-                    <h2 className="text-3xl md:text-4xl font-bold">한눈에 보는 DTE 거래 과정</h2>
+                    <h2 className="text-3xl md:text-4xl font-bold">한눈에 보는 Trustless Trade 거래 과정</h2>
                     <p className="text-purple-200 mt-2">구매자와 판매자의 화면이 어떻게 변화하는지 확인해보세요.</p>
                 </div>
 
