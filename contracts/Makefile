@@ -52,3 +52,36 @@ check-balance:
 	@forge script script/CheckBalances.s.sol:CheckBalance \
 		--rpc-url $(RPC_URL) \
 		-v
+
+check-trades:
+	@echo "Checking trades..."
+	@forge script script/CheckTrades.s.sol:CheckTrades \
+		--rpc-url $(RPC_URL) \
+		-v
+
+submit-tracking-info:
+	@echo "Submitting tracking info..."
+	@forge script script/SubmitTrackingInfo.s.sol:SubmitTrackingInfoScript \
+		--rpc-url $(RPC_URL) \
+		--broadcast \
+		-vvvv
+
+create-trade-and-deposit-token:
+	@echo "Creating and depositing trade..."
+	@forge script script/CreateTradeAndDepositToken.s.sol:CreateTradeAndDepositTokenScript \
+		--rpc-url $(RPC_URL) \
+		--broadcast \
+		-v
+
+confirm-delivery:
+	@forge script script/ConfirmDelivery.s.sol:ConfirmDeliveryScript \
+		--rpc-url $(RPC_URL) \
+		--broadcast \
+		-v
+
+
+withdraw:
+	@forge script script/Withdraw.s.sol:WithdrawScript \
+		--rpc-url $(RPC_URL) \
+		--broadcast \
+		-v

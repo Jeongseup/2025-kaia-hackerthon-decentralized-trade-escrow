@@ -1,5 +1,5 @@
 // FILE: components/demo-client.tsx (수정)
-// 설명: 빌드 경고를 해결하기 위해 사용하지 않는 모든 import 구문과 변수를 제거했습니다.
+// 설명: handleInitiateTrade 함수 내에 각 트랜잭션 호출 후 2초의 지연 시간을 추가하여 안정성을 높였습니다.
 "use client";
 
 import { useState } from 'react';
@@ -7,28 +7,45 @@ import Image from 'next/image';
 import { PhoneMockup } from '@/components/phone-mockup';
 import { Button } from '@/components/ui/button';
 import { useTradeState, TradeStatus, Trade } from '@/hooks/use-trade-state';
-import { useAccount } from 'wagmi';
+import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { keccak256, stringToBytes } from 'viem';
+import { dteAbi, erc20Abi } from '@/lib/abi';
+import { parseEther, keccak256, stringToBytes, parseEventLogs, Log } from 'viem';
 import { Truck, PackageCheck, Banknote, Upload, ShieldCheck, ShoppingBag, Landmark, RefreshCw, Hourglass } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+// import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
+
+// --- 환경 변수 ---
+const dteContractAddress = process.env.NEXT_PUBLIC_DTE_CONTRACT_ADDRESS as `0x${string}`;
+const stableKrwAddress = process.env.NEXT_PUBLIC_STABLE_KRW_CONTRACT_ADDRESS as `0x${string}`;
+const buyerDeliveryAddress = "서울시 강남구 테헤란로 123";
+const buyerDeliveryAddressHash = keccak256(stringToBytes(buyerDeliveryAddress));
+const itemName = "나이키 알파플라이 3";
+const itemPrice = 10; // KRW
+const itemImageUrl = "https://static.nike.com/a/images/t_PDP_936_v1/f_auto,q_auto:eco/3d5aaf55-e2c6-4b73-b981-812c887010fd/AIR+ZOOM+ALPHAFLY+NEXT%25+3+PRM.png";
+const deliveryTrackingNumber = "6896724158888";
+const accID = 1146;
+const callbackGasLimit = 500000;
+
+// --- 타입 정의 ---
+type TradeCreatedEventLog = Log & {
+  args: {
+    tradeId: bigint;
+  };
+};
 
 // --- UI 컴포넌트 ---
 
-// Status 0: 판매자 - 상품 등록 화면
 const SellerRegistrationView = ({ registerProduct }: { registerProduct: (product: Omit<Trade, 'id' | 'status' | 'buyer'>) => void }) => {
-    const [productName, setProductName] = useState("나이키 알파플라이 3");
-    const [amount, setAmount] = useState("250000");
-    const imageUrl = "https://static.nike.com/a/images/t_PDP_936_v1/f_auto,q_auto:eco/3d5aaf55-e2c6-4b73-b981-812c887010fd/AIR+ZOOM+ALPHAFLY+NEXT%25+3+PRM.png";
-
-    const handleRegister = () => {
+      const handleRegister = () => {
         registerProduct({
-            productName,
-            amount: Number(amount),
-            productImageUrl: imageUrl,
-            seller: "", // 이 값은 useTradeState 훅 내부에서 현재 지갑 주소로 채워집니다.
+            productName: itemName,
+            amount: itemPrice,
+            productImageUrl: itemImageUrl,
+            seller: "",
         });
     };
 
@@ -36,51 +53,144 @@ const SellerRegistrationView = ({ registerProduct }: { registerProduct: (product
         <div className="p-4 flex flex-col h-full">
             <h2 className="font-bold text-lg mb-4 text-center">상품 등록</h2>
             <div className="space-y-3 text-left flex-grow">
-                <input type="hidden" value={imageUrl} />
-                <div><label className="text-xs font-medium text-gray-600">상품명</label><Input value={productName} onChange={(e) => setProductName(e.target.value)} /></div>
-                <div><label className="text-xs font-medium text-gray-600">판매 금액 (KRW)</label><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+                <div><label className="text-xs font-medium text-gray-600">상품명</label><Input value={itemName} /></div>
+                <div><label className="text-xs font-medium text-gray-600">판매 금액 (KRW)</label><Input type="number" value={itemPrice} /></div>
             </div>
             <Button onClick={handleRegister} className="w-full mt-4"><Upload className="mr-2 h-4 w-4" /> 상품 등록하기</Button>
         </div>
     );
 };
 
-// Status 0 & 1: 구매자 - 상품 목록 화면
-const BuyerProductListView = ({ trades, createTrade }: { trades: Trade[], createTrade: (tradeId: number) => void }) => (
-    <div className="p-4 h-full flex flex-col">
-        <h2 className="font-bold text-lg mb-4 text-center">상품 목록</h2>
-        {trades.length === 0 ? (
-            <WaitView message="등록된 상품이 없습니다." />
-        ) : (
-            <div className="space-y-2 overflow-y-auto"> {/* 카드 간격을 space-y-2로 줄였습니다. */}
-                {trades.map(trade => (
-                    <Card key={trade.id}>
-                        <CardHeader className="p-0 relative aspect-square">
-                           {trade.productImageUrl && 
-                                <Image 
-                                    src={trade.productImageUrl} 
-                                    alt={trade.productName || "Product Image"}
-                                    fill
-                                    className="object-cover rounded-t-lg"
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                />
-                           }
-                        </CardHeader>
-                        <CardContent className="p-3">
-                            <CardTitle className="text-base">{trade.productName}</CardTitle>
-                            <p className="text-sm text-primary-purple font-bold">{trade.amount.toLocaleString()} KRW</p>
-                        </CardContent>
-                        <CardFooter className="p-3">
-                            <Button onClick={() => createTrade(trade.id)} className="w-full"><ShoppingBag className="mr-2 h-4 w-4" /> 거래하기</Button>
-                        </CardFooter>
-                    </Card>
-                ))}
-            </div>
-        )}
-    </div>
-);
 
-// Status 1: 판매자 - 등록된 상품 목록 화면
+const BuyerProductListView = ({ trades, updateTrade, replaceTradeId }: { trades: Trade[], updateTrade: (trade: Partial<Trade> & { id: number }) => void, replaceTradeId: (oldId: number, newId: number) => void }) => {
+    const { address } = useAccount();
+    const publicClient = usePublicClient();
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [currentTargetId, setCurrentTargetId] = useState<number | null>(null);
+
+    const { writeContractAsync: createTradeAsync } = useWriteContract();
+    const { writeContractAsync: approveAsync } = useWriteContract();
+    const { writeContractAsync: depositAsync } = useWriteContract();
+
+    const handleInitiateTrade = async (localTradeId: number) => {
+        const trade = trades.find(t => t.id === localTradeId);
+        if (!trade || !publicClient) return;
+
+        setCurrentTargetId(localTradeId);
+        setIsLoading(true);
+
+        try {
+            // --- Step 1: Create Trade ---
+            toast.info("1/6: 거래 생성 요청", { description: "지갑에서 트랜잭션에 서명해주세요." });
+            const createTxHash = await createTradeAsync({
+                address: dteContractAddress,
+                abi: dteAbi,
+                functionName: 'createTrade',
+                args: [trade.seller as `0x${string}`, parseEther(trade.amount.toString()), buyerDeliveryAddressHash],
+            });
+
+            // --- Step 2: Wait for Create Trade Receipt ---
+            toast.info("2/6: 거래 생성 확인 중...", { description: "블록체인에서 트랜잭션이 처리되기를 기다립니다." });
+            const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createTxHash });
+            if (createReceipt.status === 'reverted') throw new Error("거래 생성 트랜잭션이 실패했습니다.");
+            
+            const logs = parseEventLogs({
+              abi: dteAbi,
+              logs: createReceipt.logs,
+              eventName: "TradeCreated",
+            }) as TradeCreatedEventLog[];
+
+            if (logs.length === 0 || !logs[0].args.tradeId) {
+              throw new Error("TradeCreated 이벤트를 찾을 수 없거나 tradeId가 없습니다.");
+            }
+            const onChainTradeId = Number(logs[0].args.tradeId);
+            console.log("온체인 거래 ID:", onChainTradeId);
+            replaceTradeId(localTradeId, onChainTradeId);
+
+            // --- Step 3: Approve Tokens ---
+            toast.info("3/6: 토큰 사용 승인 요청", { description: "지갑에서 토큰 사용 승인에 서명해주세요." });
+            const approveTxHash = await approveAsync({
+                address: stableKrwAddress,
+                abi: erc20Abi,
+                functionName: 'approve',
+                args: [dteContractAddress, parseEther(trade.amount.toString())],
+            });
+
+            // --- Step 4: Wait for Approve Receipt ---
+            toast.info("4/6: 토큰 사용 승인 확인 중...", { description: "블록체인에서 승인 처리를 기다립니다." });
+            const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+            if (approveReceipt.status === 'reverted') throw new Error("토큰 사용 승인 트랜잭션이 실패했습니다.");
+
+            // --- Step 5: Deposit Funds ---
+            toast.info("5/6: 에스크로 입금 요청", { description: "지갑에서 입금 트랜잭션에 서명해주세요." });
+            const depositTxHash = await depositAsync({
+                address: dteContractAddress,
+                abi: dteAbi,
+                functionName: 'deposit',
+                args: [BigInt(onChainTradeId)],
+            });
+
+            // --- Step 6: Wait for Deposit Receipt ---
+            toast.info("6/6: 에스크로 입금 확인 중...", { description: "블록체인에서 입금 처리를 기다립니다." });
+            const depositReceipt = await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+            if (depositReceipt.status === 'reverted') throw new Error("에스크로 입금 트랜잭션이 실패했습니다.");
+
+            // --- Final Step: Update local state ---
+          toast.success("거래 성공!", { description: "안전 거래가 성공적으로 생성되었습니다." });
+          
+          let updatedTrade = trade;
+          updatedTrade = { ...updatedTrade, id: onChainTradeId, status: TradeStatus.Deposited, buyer: address || "0xBuyer", deliveryAddress: buyerDeliveryAddress, deliveryAddressHash: buyerDeliveryAddressHash };
+          console.log("update trade: ", updatedTrade);
+          updateTrade(updatedTrade);
+
+        } catch (error) {
+            console.error("Transaction failed:", error);
+            let errorMessage = "알 수 없는 오류가 발생했습니다.";
+            if (error instanceof Error) {
+                if (error.message.includes("User denied transaction signature")) {
+                    errorMessage = "사용자가 지갑에서 서명을 거부하여 거래가 취소되었습니다.";
+                } else {
+                    errorMessage = `트랜잭션 처리 중 오류가 발생했습니다: ${error.message}`;
+                }
+            }
+            toast.error("오류 발생", { description: errorMessage });
+        } finally {
+            setIsLoading(false);
+            setCurrentTargetId(null);
+        }
+    };
+
+    return (
+        <div className="p-4 h-full flex flex-col">
+            <h2 className="font-bold text-lg mb-4 text-center">상품 목록</h2>
+            {trades.length === 0 ? <WaitView message="등록된 상품이 없습니다." /> : (
+                <div className="space-y-2 overflow-y-auto">
+                    {trades.map(trade => {
+                        const isCurrentLoading = isLoading && currentTargetId === trade.id;
+                        return (
+                            <Card key={trade.id}>
+                                <CardHeader className="p-0 relative aspect-square">
+                                   {trade.productImageUrl && <Image src={trade.productImageUrl} alt={trade.productName || ""} fill className="object-cover rounded-t-lg" sizes="(max-width: 280px) 100vw" />}
+                                </CardHeader>
+                                <CardContent className="p-3">
+                                    <CardTitle className="text-base">{trade.productName}</CardTitle>
+                                    <p className="text-sm text-primary-purple font-bold">{trade.amount.toLocaleString()} KRW</p>
+                                </CardContent>
+                                <CardFooter className="p-3">
+                                    <Button onClick={() => handleInitiateTrade(trade.id)} disabled={isCurrentLoading} className="w-full">
+                                        <ShoppingBag className="mr-2 h-4 w-4" /> 
+                                        {isCurrentLoading ? '처리 중...' : '거래하기'}
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const SellerDashboardView = ({ trades }: { trades: Trade[] }) => (
     <div className="p-4 h-full flex flex-col">
         <h2 className="font-bold text-lg mb-4 text-center">내 판매 상품</h2>
@@ -95,9 +205,38 @@ const SellerDashboardView = ({ trades }: { trades: Trade[] }) => (
     </div>
 );
 
-// Status 2: 판매자 - 거래 상세 및 송장 제출 대기
 const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submitTracking: (tradeId: number, trackingNumber: string) => void }) => {
-    const [trackingNumber, setTrackingNumber] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const { writeContractAsync: submitTrackingAsync } = useWriteContract();
+    const publicClient = usePublicClient();
+
+    const handleSubmit = async () => {
+        if (!deliveryTrackingNumber || !publicClient) return;
+        setIsLoading(true);
+        toast.info("송장 정보 제출 중...", { description: "블록체인에 송장 정보를 기록합니다." });
+        console.log(trade);
+
+        try {
+            const txHash = await submitTrackingAsync({
+                address: dteContractAddress,
+                abi: dteAbi,
+                functionName: 'submitTrackingInfo',
+                args: [BigInt(trade.id), deliveryTrackingNumber, accID, callbackGasLimit], 
+            });
+
+            await publicClient.waitForTransactionReceipt({ hash: txHash });
+            toast.success("송장 정보 제출 완료!");
+            submitTracking(trade.id, deliveryTrackingNumber);
+
+        } catch (error) {
+            let errorMessage = "알 수 없는 오류가 발생했습니다.";
+            if (error instanceof Error) errorMessage = error.message.includes("User denied") ? "사용자가 서명을 거부했습니다." : error.message;
+            toast.error("오류 발생", { description: errorMessage });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="p-4 h-full flex flex-col">
             <h2 className="font-bold text-lg mb-2 text-center">거래 생성됨 (ID: {trade.id})</h2>
@@ -110,14 +249,16 @@ const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submit
             </Card>
             <div className="mt-4 pt-4 border-t">
                 <label className="text-xs font-medium text-gray-600">송장 번호</label>
-                <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="1234567890" />
-                <Button onClick={() => submitTracking(trade.id, trackingNumber)} className="w-full mt-2"><Truck className="mr-2 h-4 w-4" /> 송장번호 제출하기</Button>
+                <Input value={deliveryTrackingNumber} />
+                <Button onClick={handleSubmit} disabled={isLoading} className="w-full mt-2">
+                    <Truck className="mr-2 h-4 w-4" /> 
+                    {isLoading ? '제출 중...' : '송장번호 제출하기'}
+                </Button>
             </div>
         </div>
     );
 };
 
-// Status 4: 구매자 - 수령 확인
 const BuyerConfirmView = ({ trade, confirmDelivery }: { trade: Trade, confirmDelivery: (tradeId: number) => void }) => (
     <div className="p-4 text-center flex flex-col justify-center h-full">
         <PackageCheck className="h-12 w-12 text-trust-green mb-4 mx-auto" />
@@ -126,7 +267,6 @@ const BuyerConfirmView = ({ trade, confirmDelivery }: { trade: Trade, confirmDel
     </div>
 );
 
-// Status 5: 판매자 - 인출 대기
 const SellerWithdrawView = ({ trade, withdraw }: { trade: Trade, withdraw: (tradeId: number) => void }) => (
      <div className="p-4 text-center flex flex-col justify-center h-full">
         <Landmark className="h-12 w-12 text-primary-purple mb-4 mx-auto" />
@@ -135,7 +275,6 @@ const SellerWithdrawView = ({ trade, withdraw }: { trade: Trade, withdraw: (trad
     </div>
 );
 
-// 공통 컴포넌트
 const WaitView = ({ message }: { message: string }) => (<div className="p-6 text-center flex flex-col justify-center items-center h-full"><Hourglass className="h-12 w-12 text-gray-400 mb-4 animate-pulse" /><h2 className="font-bold text-lg mb-2">대기 중</h2><p className="text-sm text-gray-500">{message}</p></div>);
 const CompletedTradeList = ({ trades }: { trades: Trade[] }) => (<div className="p-4"><h2 className="font-bold text-lg mb-4 text-center">완료된 거래</h2>{trades.map(t => <div key={t.id} className="p-3 bg-gray-50 rounded-lg text-center text-sm"><ShieldCheck className="h-6 w-6 text-trust-green mx-auto mb-1" />{t.productName} 거래 완료</div>)}</div>);
 
@@ -143,17 +282,8 @@ const CompletedTradeList = ({ trades }: { trades: Trade[] }) => (<div className=
 // --- 메인 클라이언트 컴포넌트 ---
 export const DemoClient = () => {
     const [role, setRole] = useState<'buyer' | 'seller' | null>(null);
-    const { trades, registerProduct, updateTrade, clearAll } = useTradeState();
+    const { trades, registerProduct, updateTrade, clearAll, replaceTradeId } = useTradeState();
     const { isConnected, address } = useAccount();
-
-    const createTrade = (tradeId: number) => {
-        const trade = trades.find(t => t.id === tradeId);
-        if (!trade) return;
-        const deliveryAddress = "서울시 강남구 테헤란로 123";
-        const deliveryAddressHash = keccak256(stringToBytes(deliveryAddress));
-        
-        updateTrade({ id: tradeId, status: TradeStatus.Deposited, buyer: address || "0xBuyer", deliveryAddress, deliveryAddressHash });
-    };
     
     const submitTracking = (tradeId: number, trackingNumber: string) => {
         updateTrade({ id: tradeId, status: TradeStatus.Shipping, trackingNumber });
@@ -183,7 +313,7 @@ export const DemoClient = () => {
         );
 
         const myAddress = address || "";
-        const myTrades = trades.filter(t => role === 'buyer' ? (t.buyer === myAddress || t.buyer === "") : (t.seller === myAddress));
+        const myTrades = trades.filter(t => role === 'buyer' ? (t.buyer === myAddress || !t.buyer) : (t.seller === myAddress));
         const activeTrade = myTrades.find(t => t.status !== TradeStatus.Withdrawn && t.status !== TradeStatus.Created);
         
         let screen;
@@ -208,7 +338,7 @@ export const DemoClient = () => {
                 screen = myRegisteredItems.length > 0 ? <SellerDashboardView trades={myRegisteredItems} /> : <SellerRegistrationView registerProduct={registerProduct} />;
             } else { // buyer
                 const availableItems = trades.filter(t => t.status === TradeStatus.Created);
-                screen = <BuyerProductListView trades={availableItems} createTrade={createTrade} />;
+                screen = <BuyerProductListView trades={availableItems} updateTrade={updateTrade} replaceTradeId={replaceTradeId} />;
             }
         }
         

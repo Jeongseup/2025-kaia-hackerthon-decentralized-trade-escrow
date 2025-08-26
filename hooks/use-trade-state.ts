@@ -36,7 +36,8 @@ export const useTradeState = () => {
   // 1초마다 서버로부터 최신 거래 목록을 가져오는 함수
   const fetchTrades = useCallback(async () => {
     try {
-      const response = await fetch("/api/trades");
+      // [핵심 수정] { cache: 'no-store' } 옵션을 추가하여 항상 최신 데이터를 서버에서 가져오도록 합니다.
+      const response = await fetch("/api/trades", { cache: "no-store" });
       if (response.ok) {
         const data = await response.json();
         setTrades(data);
@@ -69,14 +70,26 @@ export const useTradeState = () => {
   };
 
   const updateTrade = async (updatedTrade: Partial<Trade> & { id: number }) => {
-    const currentTrade = trades.find((t) => t.id === updatedTrade.id);
-    if (!currentTrade) return;
-
-    const newTradeState = { ...currentTrade, ...updatedTrade };
+    // [핵심 수정] 클라이언트에서 상태를 찾고 병합하는 대신,
+    // 필요한 변경 사항만 서버로 직접 보냅니다. 서버가 상태 병합을 책임집니다.
     await fetch("/api/trades", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newTradeState),
+      body: JSON.stringify(updatedTrade),
+    });
+    fetchTrades(); // 즉시 상태 업데이트
+  };
+
+  const replaceTradeId = async (oldId: number, newId: number) => {
+    const tradeToUpdate = trades.find((t) => t.id === oldId);
+    if (!tradeToUpdate) return;
+
+    const payload = { ...tradeToUpdate, id: newId, oldId: oldId };
+
+    await fetch("/api/trades", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
     fetchTrades(); // 즉시 상태 업데이트
   };
@@ -86,5 +99,5 @@ export const useTradeState = () => {
     fetchTrades(); // 즉시 상태 업데이트
   };
 
-  return { trades, registerProduct, updateTrade, clearAll };
+  return { trades, registerProduct, updateTrade, clearAll, replaceTradeId };
 };

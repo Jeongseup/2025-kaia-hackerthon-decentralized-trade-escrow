@@ -24,10 +24,19 @@ export async function POST(request: Request) {
   return NextResponse.json(newTrade, { status: 201 });
 }
 
-// PUT: 기존 거래의 상태를 업데이트
+// PUT: 기존 거래의 상태를 업데이트. oldId가 있으면 id를 교체.
 export async function PUT(request: Request) {
-  const updatedTrade: Trade = await request.json();
-  trades = trades.map((t) => (t.id === updatedTrade.id ? updatedTrade : t));
+  const updatedTrade: Trade & { oldId?: number } = await request.json();
+  const { oldId } = updatedTrade;
+
+  if (oldId) {
+    // oldId가 있으면, 해당 id를 찾아서 updatedTrade 데이터로 교체 (id 포함)
+    trades = trades.map((t) => (t.id === oldId ? updatedTrade : t));
+  } else {
+    // oldId가 없으면, 기존 방식대로 id를 기준으로 업데이트
+    trades = trades.map((t) => (t.id === updatedTrade.id ? updatedTrade : t));
+  }
+
   return NextResponse.json(updatedTrade);
 }
 

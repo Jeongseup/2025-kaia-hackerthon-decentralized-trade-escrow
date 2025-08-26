@@ -3,13 +3,14 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import "@rainbow-me/rainbowkit/styles.css"; // RainbowKit CSS 추가
 import { Providers } from "./providers";
+import { Toaster } from "@/components/ui/sonner"; // Toaster import
 
 // Google Font를 next/font를 통해 최적화하여 불러옵니다.
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "GeoSynth API - 강력하고 유연한 위치 데이터 API",
-  description: "GeoSynth API로 비즈니스에 필요한 인사이트를 실시간으로 얻고, 사용자의 경험을 혁신하세요.",
+  title: "DTE - Decentralized Trade Escrow",
+  description: "믿지 않아도 안전한 P2P 거래, DTE와 함께하세요.",
 };
 
 export default function RootLayout({
@@ -23,7 +24,8 @@ export default function RootLayout({
         inter.className을 통해 Inter 폰트를 전역으로 적용합니다.
       */}
       <body className={`${inter.className} bg-white text-gray-800`}>
-         <Providers>{children}</Providers>
+        <Providers>{children}</Providers>
+        <Toaster /> {/* Toaster 컴포넌트 추가 */}
       </body>
     </html>
   );

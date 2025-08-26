@@ -50,6 +50,7 @@ contract DecentralizedTradeEscrow is
     mapping(uint256 => uint256) public requestToTradeId; // Oracle requestId to tradeId
 
     uint256 public disputePeriod;
+    string private s_trackingApiKey;
 
     // Events
     event TradeCreated(
@@ -76,6 +77,7 @@ contract DecentralizedTradeEscrow is
         bool refundedToBuyer
     );
     event DisputePeriodUpdated(uint256 newPeriod);
+    event TrackingApiKeyUpdated();
 
     // Modifiers
     modifier onlyBuyer(uint256 _tradeId) {
@@ -98,17 +100,20 @@ contract DecentralizedTradeEscrow is
      * @param _stableKRWAddress The address of the StableKRW (ERC20) token contract.
      * @param _coordinator The address of the Orakl Coordinator contract.
      * @param _initialOwner The initial owner of the contract.
+     * @param _trackingApiKey The api key for tracking delivery.
      */
     constructor(
         address _stableKRWAddress,
         address _coordinator,
-        address _initialOwner
+        address _initialOwner,
+        string memory _trackingApiKey
     ) RequestResponseConsumerBase(_coordinator) Ownable(_initialOwner) {
         require(
             _stableKRWAddress != address(0),
             "DTE: StableKRW address cannot be zero"
         );
         STABLE_KRW_ADDRESS = IERC20(_stableKRWAddress);
+        s_trackingApiKey = _trackingApiKey;
         disputePeriod = 7 days;
     }
 
@@ -116,6 +121,11 @@ contract DecentralizedTradeEscrow is
 
     function setDeliveryTrackingJobId(bytes32 _jobId) external onlyOwner {
         deliveryTrackingJobId = _jobId;
+    }
+
+    function setTrackingApiKey(string calldata _newKey) external onlyOwner {
+        s_trackingApiKey = _newKey;
+        emit TrackingApiKeyUpdated();
     }
 
     function setDisputePeriod(uint256 _newPeriod) external onlyOwner {
@@ -226,22 +236,32 @@ contract DecentralizedTradeEscrow is
             bytes(_trackingNumber).length > 0,
             "DTE: Tracking number cannot be empty"
         );
-        require(deliveryTrackingJobId != bytes32(0), "DTE: Job ID not set");
+        require(
+            bytes(s_trackingApiKey).length > 0,
+            "DTE: Tracking API key not set"
+        );
 
-        // TODO: 송장번호를 number로 할지, 아니면 hash값으로 할지?
-        // TODO: 송장번호랑 함께 택배사 코드도 같이 전달해야할지?
         trade.trackingNumber = _trackingNumber;
 
-        // TODO: 실제 택배 API 에 맞춰서 변경해야함.
-        Orakl.Request memory req = buildRequest(deliveryTrackingJobId);
-        req.add(
-            "get",
-            "https://api.coinbase.com/v2/exchange-rates?currency=BTC"
+        bytes32 jobId = keccak256(abi.encodePacked("uint128"));
+        uint8 numSubmission = 1;
+        string memory url = string.concat(
+            "https://info.sweettracker.co.kr/api/v1/trackingInfo?t_code=01&t_invoice=",
+            _trackingNumber,
+            "&t_key=",
+            s_trackingApiKey
         );
-        req.add("path", "data,rates,USDT");
-        req.add("pow10", "8");
 
-        requestId = COORDINATOR.requestData(req, _callbackGasLimit, _accId, 1);
+        Orakl.Request memory req = buildRequest(jobId);
+        req.add("get", url);
+        req.add("path", "level");
+
+        requestId = COORDINATOR.requestData(
+            req,
+            _callbackGasLimit,
+            _accId,
+            numSubmission
+        );
 
         requestToTradeId[requestId] = _tradeId;
         trade.status = TradeStatus.Shipping;
