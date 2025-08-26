@@ -81,10 +81,24 @@ export const useTradeState = () => {
     fetchTrades(); // 즉시 상태 업데이트
   };
 
+  const replaceTradeId = async (oldId: number, newId: number) => {
+    const tradeToUpdate = trades.find((t) => t.id === oldId);
+    if (!tradeToUpdate) return;
+
+    const payload = { ...tradeToUpdate, id: newId, oldId: oldId };
+
+    await fetch("/api/trades", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    fetchTrades(); // 즉시 상태 업데이트
+  };
+
   const clearAll = async () => {
     await fetch("/api/trades", { method: "DELETE" });
     fetchTrades(); // 즉시 상태 업데이트
   };
 
-  return { trades, registerProduct, updateTrade, clearAll };
+  return { trades, registerProduct, updateTrade, clearAll, replaceTradeId };
 };

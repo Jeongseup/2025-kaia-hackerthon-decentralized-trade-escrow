@@ -52,3 +52,9 @@ check-balance:
 	@forge script script/CheckBalances.s.sol:CheckBalance \
 		--rpc-url $(RPC_URL) \
 		-v
+
+check-trades:
+	@echo "Checking trades..."
+	@forge script script/CheckTrades.s.sol:CheckTrades \
+		--rpc-url $(RPC_URL) \
+		-v

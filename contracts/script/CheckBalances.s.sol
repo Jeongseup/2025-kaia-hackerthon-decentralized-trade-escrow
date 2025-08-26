@@ -23,9 +23,8 @@ contract CheckBalance is Script {
         // 가장 최근에 실행된 DeployAll.s.sol 스크립트의 배포 정보를 가져옵니다.
         // Utilities.s.sol 헬퍼 컨트랙트를 사용하여 broadcast 로그에서 컨트랙트 주소를 읽어옵니다.
         Utilities utils = new Utilities();
-        (address stableKRWAddress, ) = utils.getMostRecentDeployment(
-            "DeployDecentralizedTradeEscrow"
-        );
+        (address stableKRWAddress, address dteAddress) = utils
+            .getMostRecentDeployment("DeployDecentralizedTradeEscrow");
         require(
             stableKRWAddress != address(0),
             "Deployment not found. Run deployment script first."
@@ -39,15 +38,20 @@ contract CheckBalance is Script {
         // --- 잔액 확인 ---
         uint256 buyerBalance = stableKRW.balanceOf(buyerAddress);
         uint256 sellerBalance = stableKRW.balanceOf(sellerAddress);
+        uint256 dteBalance = stableKRW.balanceOf(dteAddress);
 
         console.log("--- Balance Check ---");
         console.log("Token Address: ", stableKRWAddress);
+        console.log("DTE Address: ", dteAddress);
         console.log("---------------------");
         console.log("Buyer Address:  ", buyerAddress);
         console.log("Buyer Balance:  ", buyerBalance / 1e18, "SKRW");
         console.log("---------------------");
         console.log("Seller Address: ", sellerAddress);
         console.log("Seller Balance: ", sellerBalance / 1e18, "SKRW");
+        console.log("---------------------");
+        console.log("DTE Address: ", dteAddress);
+        console.log("DTE Balance: ", dteBalance / 1e18, "SKRW");
         console.log("---------------------");
     }
 }
