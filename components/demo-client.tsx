@@ -26,6 +26,10 @@ const buyerDeliveryAddressHash = keccak256(stringToBytes(buyerDeliveryAddress));
 const itemName = "나이키 알파플라이 3";
 const itemPrice = 10; // KRW
 const itemImageUrl = "https://static.nike.com/a/images/t_PDP_936_v1/f_auto,q_auto:eco/3d5aaf55-e2c6-4b73-b981-812c887010fd/AIR+ZOOM+ALPHAFLY+NEXT%25+3+PRM.png";
+const deliveryTrackingNumber = "6896724158888";
+const accID = process.env.NEXT_PUBLIC_ACC_ID;
+const callbackGasLimit = "500000";
+
 // --- 타입 정의 ---
 type TradeCreatedEventLog = Log & {
   args: {
@@ -202,27 +206,27 @@ const SellerDashboardView = ({ trades }: { trades: Trade[] }) => (
 );
 
 const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submitTracking: (tradeId: number, trackingNumber: string) => void }) => {
-    const [trackingNumber, setTrackingNumber] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const { writeContractAsync: submitTrackingAsync } = useWriteContract();
     const publicClient = usePublicClient();
 
     const handleSubmit = async () => {
-        if (!trackingNumber || !publicClient) return;
+        if (!deliveryTrackingNumber || !publicClient) return;
         setIsLoading(true);
         toast.info("송장 정보 제출 중...", { description: "블록체인에 송장 정보를 기록합니다." });
+        console.log(trade);
 
         try {
             const txHash = await submitTrackingAsync({
                 address: dteContractAddress,
                 abi: dteAbi,
                 functionName: 'submitTrackingInfo',
-                args: [BigInt(trade.id), trackingNumber, BigInt(0), 100000], // accId와 callbackGasLimit은 데모용 값
+                args: [BigInt(trade.id), deliveryTrackingNumber, accID, callbackGasLimit], 
             });
 
             await publicClient.waitForTransactionReceipt({ hash: txHash });
             toast.success("송장 정보 제출 완료!");
-            submitTracking(trade.id, trackingNumber);
+            submitTracking(trade.id, deliveryTrackingNumber);
 
         } catch (error) {
             let errorMessage = "알 수 없는 오류가 발생했습니다.";
@@ -245,7 +249,7 @@ const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submit
             </Card>
             <div className="mt-4 pt-4 border-t">
                 <label className="text-xs font-medium text-gray-600">송장 번호</label>
-                <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="1234567890" />
+                <Input value={deliveryTrackingNumber} />
                 <Button onClick={handleSubmit} disabled={isLoading} className="w-full mt-2">
                     <Truck className="mr-2 h-4 w-4" /> 
                     {isLoading ? '제출 중...' : '송장번호 제출하기'}
