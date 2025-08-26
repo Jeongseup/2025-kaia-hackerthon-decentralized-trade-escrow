@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "@rainbow-me/rainbowkit/styles.css"; // RainbowKit CSS 추가
+import { Providers } from "./providers";
 
 // Google Font를 next/font를 통해 최적화하여 불러옵니다.
 const inter = Inter({ subsets: ["latin"] });
@@ -21,7 +23,7 @@ export default function RootLayout({
         inter.className을 통해 Inter 폰트를 전역으로 적용합니다.
       */}
       <body className={`${inter.className} bg-white text-gray-800`}>
-        {children}
+         <Providers>{children}</Providers>
       </body>
     </html>
   );
