@@ -1,1 +1,3 @@
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@bisonai/orakl-contracts/src/v0.1/=lib/orakl/contracts/v0.1/src/
 orakl-contracts/=lib/orakl/contracts/
