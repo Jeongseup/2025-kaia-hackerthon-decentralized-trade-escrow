@@ -17,15 +17,23 @@ module.exports = {
     },
     extend: {
       colors: {
-        "primary-purple": "#667eea",
-        "secondary-purple": "#764ba2",
-        "kaia-yellow": "#FEE500",
-        "trust-green": "#155724",
-        "trust-light-green": "#d4edda",
-        "trust-blue": "#004085",
-        "trust-light-blue": "#cce5ff",
-        "trust-yellow": "#856404",
-        "trust-light-yellow": "#fff3cd",
+        // --- 브랜드 컬러 ---
+        "primary-purple": "#667eea", // (유지) 밝고 친근한 메인 퍼플
+        "secondary-purple": "#764ba2", // (유지) 깊고 신뢰감 있는 서브 퍼플
+
+        // --- Accent Color (포인트 컬러) ---
+        "kaia-yellow": "#FEE500", // (유지) 가장 중요한 CTA를 위한 강력한 대비 색상
+
+        // --- Semantic Colors (상태별 정보 전달 컬러) ---
+        // 기존 색상보다 브랜드 컬러(보라색)와 조화롭고 현대적인 톤으로 변경했습니다.
+        "trust-green": "#16a34a", // 성공(Success): 선명하고 긍정적인 녹색
+        "trust-light-green": "#dcfce7", // 성공 배경: 부드러운 파스텔 톤 녹색
+
+        "trust-blue": "#2563eb", // 정보(Info): 명확하고 깔끔한 파란색
+        "trust-light-blue": "#dbeafe", // 정보 배경: 부드러운 파스텔 톤 파란색
+
+        "trust-yellow": "#d97706", // 경고(Warning): 주의를 끄는 호박색(Amber) 계열
+        "trust-light-yellow": "#fef3c7", // 경고 배경: 부드러운 파스텔 톤 노란색
         // shadcn/ui 기본 색상 설정
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -82,5 +90,6 @@ module.exports = {
       },
     },
   },
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   plugins: [require("tailwindcss-animate")],
 };

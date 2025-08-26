@@ -10,7 +10,7 @@ export const Header = () => {
 
   const navLinks = [
     { href: "#", label: "서비스 소개" },
-    { href: "#", label: "데모 페이지" },
+    { href: "/demo", label: "데모 페이지" },
     { href: "#", label: "API 문서" },
     { href: "#", label: "요금제" },
     { href: "#", label: "개발자 포털" },

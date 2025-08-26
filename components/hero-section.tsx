@@ -11,7 +11,7 @@ export const HeroSection = () => {
         </p>
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
           <Button size="lg" asChild className="bg-kaia-yellow text-gray-900 font-bold hover:bg-kaia-yellow/90 text-lg px-8 py-6 w-full sm:w-auto">
-            <Link href="#">데모 체험하기</Link>
+            <Link href="/demo">데모 체험하기</Link>
           </Button>
           <Button size="lg" variant="outline" asChild className="border-2 border-white text-white font-bold hover:bg-white hover:text-primary-purple text-lg px-8 py-6 w-full sm:w-auto">
             <Link href="#">API 문서 보기</Link>
