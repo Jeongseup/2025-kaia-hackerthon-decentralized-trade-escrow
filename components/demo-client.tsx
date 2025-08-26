@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { PhoneMockup } from '@/components/phone-mockup';
 import { Button } from '@/components/ui/button';
 import { useTradeState, TradeStatus, Trade } from '@/hooks/use-trade-state';
-import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
+import { useAccount, useWriteContract, usePublicClient, useReadContract } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { dteAbi, erc20Abi } from '@/lib/abi';
 import { parseEther, keccak256, stringToBytes, parseEventLogs, Log } from 'viem';
@@ -32,15 +32,15 @@ const callbackGasLimit = 500000;
 
 // --- 타입 정의 ---
 type TradeCreatedEventLog = Log & {
-  args: {
-    tradeId: bigint;
-  };
+    args: {
+        tradeId: bigint;
+    };
 };
 
 // --- UI 컴포넌트 ---
 
 const SellerRegistrationView = ({ registerProduct }: { registerProduct: (product: Omit<Trade, 'id' | 'status' | 'buyer'>) => void }) => {
-      const handleRegister = () => {
+    const handleRegister = () => {
         registerProduct({
             productName: itemName,
             amount: itemPrice,
@@ -93,15 +93,15 @@ const BuyerProductListView = ({ trades, updateTrade, replaceTradeId }: { trades:
             toast.info("2/6: 거래 생성 확인 중...", { description: "블록체인에서 트랜잭션이 처리되기를 기다립니다." });
             const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createTxHash });
             if (createReceipt.status === 'reverted') throw new Error("거래 생성 트랜잭션이 실패했습니다.");
-            
+
             const logs = parseEventLogs({
-              abi: dteAbi,
-              logs: createReceipt.logs,
-              eventName: "TradeCreated",
+                abi: dteAbi,
+                logs: createReceipt.logs,
+                eventName: "TradeCreated",
             }) as TradeCreatedEventLog[];
 
             if (logs.length === 0 || !logs[0].args.tradeId) {
-              throw new Error("TradeCreated 이벤트를 찾을 수 없거나 tradeId가 없습니다.");
+                throw new Error("TradeCreated 이벤트를 찾을 수 없거나 tradeId가 없습니다.");
             }
             const onChainTradeId = Number(logs[0].args.tradeId);
             console.log("온체인 거래 ID:", onChainTradeId);
@@ -136,12 +136,12 @@ const BuyerProductListView = ({ trades, updateTrade, replaceTradeId }: { trades:
             if (depositReceipt.status === 'reverted') throw new Error("에스크로 입금 트랜잭션이 실패했습니다.");
 
             // --- Final Step: Update local state ---
-          toast.success("거래 성공!", { description: "안전 거래가 성공적으로 생성되었습니다." });
-          
-          let updatedTrade = trade;
-          updatedTrade = { ...updatedTrade, id: onChainTradeId, status: TradeStatus.Deposited, buyer: address || "0xBuyer", deliveryAddress: buyerDeliveryAddress, deliveryAddressHash: buyerDeliveryAddressHash };
-          console.log("update trade: ", updatedTrade);
-          updateTrade(updatedTrade);
+            toast.success("거래 성공!", { description: "안전 거래가 성공적으로 생성되었습니다." });
+
+            let updatedTrade = trade;
+            updatedTrade = { ...updatedTrade, id: onChainTradeId, status: TradeStatus.Deposited, buyer: address || "0xBuyer", deliveryAddress: buyerDeliveryAddress, deliveryAddressHash: buyerDeliveryAddressHash };
+            console.log("update trade: ", updatedTrade);
+            updateTrade(updatedTrade);
 
         } catch (error) {
             console.error("Transaction failed:", error);
@@ -170,7 +170,7 @@ const BuyerProductListView = ({ trades, updateTrade, replaceTradeId }: { trades:
                         return (
                             <Card key={trade.id}>
                                 <CardHeader className="p-0 relative aspect-square">
-                                   {trade.productImageUrl && <Image src={trade.productImageUrl} alt={trade.productName || ""} fill className="object-cover rounded-t-lg" sizes="(max-width: 280px) 100vw" />}
+                                    {trade.productImageUrl && <Image src={trade.productImageUrl} alt={trade.productName || ""} fill className="object-cover rounded-t-lg" sizes="(max-width: 280px) 100vw" />}
                                 </CardHeader>
                                 <CardContent className="p-3">
                                     <CardTitle className="text-base">{trade.productName}</CardTitle>
@@ -178,7 +178,7 @@ const BuyerProductListView = ({ trades, updateTrade, replaceTradeId }: { trades:
                                 </CardContent>
                                 <CardFooter className="p-3">
                                     <Button onClick={() => handleInitiateTrade(trade.id)} disabled={isCurrentLoading} className="w-full">
-                                        <ShoppingBag className="mr-2 h-4 w-4" /> 
+                                        <ShoppingBag className="mr-2 h-4 w-4" />
                                         {isCurrentLoading ? '처리 중...' : '거래하기'}
                                     </Button>
                                 </CardFooter>
@@ -205,8 +205,14 @@ const SellerDashboardView = ({ trades }: { trades: Trade[] }) => (
     </div>
 );
 
-const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submitTracking: (tradeId: number, trackingNumber: string) => void }) => {
+const SellerTradeDetailView = ({ trade, updateTrade }: { trade: Trade, updateTrade: (trade: Partial<Trade> & { id: number }) => void }) => {
     const [isLoading, setIsLoading] = useState(false);
+    const { refetch } = useReadContract({
+        address: dteContractAddress,
+        abi: dteAbi,
+        functionName: 'getTrade',
+        args: [BigInt(trade.id)]
+    });
     const { writeContractAsync: submitTrackingAsync } = useWriteContract();
     const publicClient = usePublicClient();
 
@@ -214,19 +220,42 @@ const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submit
         if (!deliveryTrackingNumber || !publicClient) return;
         setIsLoading(true);
         toast.info("송장 정보 제출 중...", { description: "블록체인에 송장 정보를 기록합니다." });
-        console.log(trade);
-
         try {
             const txHash = await submitTrackingAsync({
                 address: dteContractAddress,
                 abi: dteAbi,
                 functionName: 'submitTrackingInfo',
-                args: [BigInt(trade.id), deliveryTrackingNumber, accID, callbackGasLimit], 
+                args: [BigInt(trade.id), deliveryTrackingNumber, accID, callbackGasLimit],
             });
 
             await publicClient.waitForTransactionReceipt({ hash: txHash });
             toast.success("송장 정보 제출 완료!");
-            submitTracking(trade.id, deliveryTrackingNumber);
+            let updatedTrade = trade;
+            updatedTrade = { ...updatedTrade, status: TradeStatus.Shipping, trackingNumber: deliveryTrackingNumber };
+            updateTrade(updatedTrade);
+
+            // 오라클의 응답을 2초마다 확인하는 로직 시작
+            const intervalId = setInterval(async () => {
+                console.log("Checking trade status...");
+                const resp = await refetch(); // 상태를 다시 가져오는 함수 (useReadContract의 refetch 등)
+
+                if (resp.data && typeof resp.data === 'object' && 'status' in resp.data) {
+                    const data = resp.data as { status: TradeStatus };
+
+                    // 조건 확인: 상태가 'Delivered'인가?
+                    if (data.status === TradeStatus.Delivered) {
+                        console.log("Delivery confirmed! Stopping the check.");
+
+                        // 1. 반복을 중단합니다. (매우 중요!)
+                        clearInterval(intervalId);
+
+                        // 2. 최종 상태를 업데이트합니다.
+                        updatedTrade = { ...updatedTrade, status: TradeStatus.Delivered };
+
+                        updateTrade(updatedTrade);
+                    }
+                }
+            }, 2000); // 2000ms = 2초            
 
         } catch (error) {
             let errorMessage = "알 수 없는 오류가 발생했습니다.";
@@ -251,7 +280,7 @@ const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submit
                 <label className="text-xs font-medium text-gray-600">송장 번호</label>
                 <Input value={deliveryTrackingNumber} />
                 <Button onClick={handleSubmit} disabled={isLoading} className="w-full mt-2">
-                    <Truck className="mr-2 h-4 w-4" /> 
+                    <Truck className="mr-2 h-4 w-4" />
                     {isLoading ? '제출 중...' : '송장번호 제출하기'}
                 </Button>
             </div>
@@ -268,7 +297,7 @@ const BuyerConfirmView = ({ trade, confirmDelivery }: { trade: Trade, confirmDel
 );
 
 const SellerWithdrawView = ({ trade, withdraw }: { trade: Trade, withdraw: (tradeId: number) => void }) => (
-     <div className="p-4 text-center flex flex-col justify-center h-full">
+    <div className="p-4 text-center flex flex-col justify-center h-full">
         <Landmark className="h-12 w-12 text-primary-purple mb-4 mx-auto" />
         <h2 className="font-bold text-lg mb-4">정산 가능</h2>
         <Button onClick={() => withdraw(trade.id)} className="w-full"><Banknote className="mr-2 h-4 w-4" /> 대금 인출하기</Button>
@@ -284,21 +313,6 @@ export const DemoClient = () => {
     const [role, setRole] = useState<'buyer' | 'seller' | null>(null);
     const { trades, registerProduct, updateTrade, clearAll, replaceTradeId } = useTradeState();
     const { isConnected, address } = useAccount();
-    
-    const submitTracking = (tradeId: number, trackingNumber: string) => {
-        updateTrade({ id: tradeId, status: TradeStatus.Shipping, trackingNumber });
-        setTimeout(() => {
-            updateTrade({ id: tradeId, status: TradeStatus.Delivered, trackingNumber });
-        }, 2000);
-    };
-
-    const confirmDelivery = (tradeId: number) => {
-        updateTrade({ id: tradeId, status: TradeStatus.Completed });
-    };
-
-    const withdraw = (tradeId: number) => {
-        updateTrade({ id: tradeId, status: TradeStatus.Withdrawn });
-    };
 
     const renderContent = () => {
         if (!isConnected) return <div className="flex flex-col items-center gap-4 text-white"><p>데모를 시작하려면 지갑을 연결해주세요.</p><ConnectButton /></div>;
@@ -312,18 +326,26 @@ export const DemoClient = () => {
             </div>
         );
 
+        const confirmDelivery = (tradeId: number) => {
+            updateTrade({ id: tradeId, status: TradeStatus.Completed });
+        };
+
+        const withdraw = (tradeId: number) => {
+            updateTrade({ id: tradeId, status: TradeStatus.Withdrawn });
+        };
+
         const myAddress = address || "";
         const myTrades = trades.filter(t => role === 'buyer' ? (t.buyer === myAddress || !t.buyer) : (t.seller === myAddress));
         const activeTrade = myTrades.find(t => t.status !== TradeStatus.Withdrawn && t.status !== TradeStatus.Created);
-        
+
         let screen;
         if (activeTrade) {
             switch (activeTrade.status) {
                 case TradeStatus.Deposited:
-                    screen = role === 'seller' ? <SellerTradeDetailView trade={activeTrade} submitTracking={submitTracking} /> : <WaitView message="판매자가 상품을 발송할 예정입니다." />;
+                    screen = role === 'seller' ? <SellerTradeDetailView trade={activeTrade} updateTrade={updateTrade} /> : <WaitView message="판매자가 상품을 발송할 예정입니다." />;
                     break;
                 case TradeStatus.Shipping:
-                    screen = role === 'buyer' ? <WaitView message={`배송 추적 중... (${activeTrade.trackingNumber})`} /> : <WaitView message="상품이 배송 중입니다." />;
+                    screen = role === 'buyer' ? <WaitView message={`배송 추적 중... (${activeTrade.trackingNumber})`} /> : <WaitView message="송장번호 제출을 완료하였습니다. 오라클 서비스가 곧 데이터를 업데이트 할 것입니다." />;
                     break;
                 case TradeStatus.Delivered:
                     screen = role === 'buyer' ? <BuyerConfirmView trade={activeTrade} confirmDelivery={confirmDelivery} /> : <WaitView message="구매자의 수령 확인을 기다리고 있습니다." />;
@@ -341,7 +363,7 @@ export const DemoClient = () => {
                 screen = <BuyerProductListView trades={availableItems} updateTrade={updateTrade} replaceTradeId={replaceTradeId} />;
             }
         }
-        
+
         return (
             <div>
                 <div className="w-full max-w-sm mx-auto">
@@ -355,6 +377,6 @@ export const DemoClient = () => {
             </div>
         );
     };
-  
+
     return renderContent();
 };

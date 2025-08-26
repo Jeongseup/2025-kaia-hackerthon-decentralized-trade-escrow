@@ -25,7 +25,16 @@ export default function RootLayout({
       */}
       <body className={`${inter.className} bg-white text-gray-800`}>
         <Providers>{children}</Providers>
-        <Toaster /> {/* Toaster 컴포넌트 추가 */}
+        <Toaster
+            richColors
+            toastOptions={{
+              classNames: {
+                toast: 'border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900',
+                title: 'text-neutral-950 dark:text-neutral-50',
+                description: 'text-neutral-500 dark:text-neutral-400',
+              },
+            }}
+          />
       </body>
     </html>
   );
