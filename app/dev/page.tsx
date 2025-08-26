@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useReadContract } from 'wagmi';
 import { Abi, AbiFunction } from "viem";
-import requestResponseConsumerAbi from '@/lib/abis/RequestResponseConsumer.json';
+import requestResponseConsumerAbi from '@/contracts-artifacts/DecentralizedTradeEscrow.sol/DecentralizedTradeEscrow.json'; 
 
 // Shadcn UI 컴포넌트 임포트
 import {
