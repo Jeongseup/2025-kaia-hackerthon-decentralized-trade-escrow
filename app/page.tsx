@@ -6,6 +6,7 @@ import { SocialProofSection } from "@/components/social-proof-section";
 import { TrustColorsDemoSection } from "@/components/trust-colors-demo-section";
 import { FinalCtaSection } from "@/components/final-cta-section";
 import { Footer } from "@/components/footer";
+import { AutoDemoSlider } from "@/components/auto-demo-slider"; // 새로 추가된 컴포넌트 import
 
 export default function Home() {
   return (
@@ -17,6 +18,8 @@ export default function Home() {
       <main>
         <HeroSection />
         <FeaturesSection />
+        {/* === 자동 데모 슬라이더 섹션 추가 === */}
+        <AutoDemoSlider />
         <HowItWorksSection />
         <SocialProofSection />
         <TrustColorsDemoSection />
