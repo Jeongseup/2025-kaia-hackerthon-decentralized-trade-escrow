@@ -288,21 +288,93 @@ const SellerTradeDetailView = ({ trade, updateTrade }: { trade: Trade, updateTra
     );
 };
 
-const BuyerConfirmView = ({ trade, confirmDelivery }: { trade: Trade, confirmDelivery: (tradeId: number) => void }) => (
-    <div className="p-4 text-center flex flex-col justify-center h-full">
-        <PackageCheck className="h-12 w-12 text-trust-green mb-4 mx-auto" />
-        <h2 className="font-bold text-lg mb-4">배송 완료</h2>
-        <Button onClick={() => confirmDelivery(trade.id)} className="w-full bg-trust-green hover:bg-trust-green/90">수령 확인</Button>
-    </div>
-);
 
-const SellerWithdrawView = ({ trade, withdraw }: { trade: Trade, withdraw: (tradeId: number) => void }) => (
-    <div className="p-4 text-center flex flex-col justify-center h-full">
-        <Landmark className="h-12 w-12 text-primary-purple mb-4 mx-auto" />
-        <h2 className="font-bold text-lg mb-4">정산 가능</h2>
-        <Button onClick={() => withdraw(trade.id)} className="w-full"><Banknote className="mr-2 h-4 w-4" /> 대금 인출하기</Button>
-    </div>
-);
+const BuyerConfirmView = ({ trade, updateTrade }: { trade: Trade, updateTrade: (trade: Partial<Trade> & { id: number }) => void }) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const { writeContractAsync: confirmDeliveryAsync } = useWriteContract();
+    const publicClient = usePublicClient();
+
+    const handleConfirm = async () => {
+        if (!publicClient) return;
+        setIsLoading(true);
+        toast.info("수령 확인 중...", { description: "블록체인에 거래 완료를 기록합니다." });
+
+        try {
+            const txHash = await confirmDeliveryAsync({
+                address: dteContractAddress,
+                abi: dteAbi,
+                functionName: 'confirmDelivery',
+                args: [BigInt(trade.id)],
+            });
+            await publicClient.waitForTransactionReceipt({ hash: txHash });
+            toast.success("수령 확인 완료!");
+            let updatedTrade = trade;
+            updatedTrade = { ...updatedTrade, status: TradeStatus.Completed };
+            updateTrade(updatedTrade);
+        } catch (error) {
+            let errorMessage = "알 수 없는 오류가 발생했습니다.";
+            if (error instanceof Error) errorMessage = error.message.includes("User denied") ? "사용자가 서명을 거부했습니다." : error.message;
+            toast.error("오류 발생", { description: errorMessage });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="p-4 text-center flex flex-col justify-center h-full">
+            <PackageCheck className="h-12 w-12 text-trust-green mb-4 mx-auto" />
+            <h2 className="font-bold text-lg mb-4">배송 완료</h2>
+            <Button onClick={handleConfirm} disabled={isLoading} className="w-full bg-trust-green hover:bg-trust-green/90">
+                {isLoading ? '처리 중...' : '수령 확인'}
+            </Button>
+        </div>
+    );
+};
+
+
+const SellerWithdrawView = ({ trade, updateTrade }: { trade: Trade, updateTrade: (trade: Partial<Trade> & { id: number }) => void }) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const { writeContractAsync: withdrawAsync } = useWriteContract();
+    const publicClient = usePublicClient();
+
+    const handleWithdraw = async () => {
+        if (!publicClient) return;
+        setIsLoading(true);
+        toast.info("대금 인출 중...", { description: "에스크로된 자금을 인출하고 있습니다." });
+
+        try {
+            const txHash = await withdrawAsync({
+                address: dteContractAddress,
+                abi: dteAbi,
+                functionName: 'withdraw',
+                args: [BigInt(trade.id)],
+            });
+            await publicClient.waitForTransactionReceipt({ hash: txHash });
+            toast.success("대금 인출 완료!");
+            let updatedTrade = trade;
+            updatedTrade = { ...updatedTrade, status: TradeStatus.Withdrawn };
+            updateTrade(updatedTrade);
+        } catch (error) {
+            let errorMessage = "알 수 없는 오류가 발생했습니다.";
+            if (error instanceof Error) errorMessage = error.message.includes("User denied") ? "사용자가 서명을 거부했습니다." : error.message;
+            toast.error("오류 발생", { description: errorMessage });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+         <div className="p-4 text-center flex flex-col justify-center h-full">
+            <Landmark className="h-12 w-12 text-primary-purple mb-4 mx-auto" />
+            <h2 className="font-bold text-lg mb-4">정산 가능</h2>
+            <Button onClick={handleWithdraw} disabled={isLoading} className="w-full">
+                <Banknote className="mr-2 h-4 w-4" /> 
+                {isLoading ? '인출 중...' : '대금 인출하기'}
+            </Button>
+        </div>
+    );
+};
+
 
 const WaitView = ({ message }: { message: string }) => (<div className="p-6 text-center flex flex-col justify-center items-center h-full"><Hourglass className="h-12 w-12 text-gray-400 mb-4 animate-pulse" /><h2 className="font-bold text-lg mb-2">대기 중</h2><p className="text-sm text-gray-500">{message}</p></div>);
 const CompletedTradeList = ({ trades }: { trades: Trade[] }) => (<div className="p-4"><h2 className="font-bold text-lg mb-4 text-center">완료된 거래</h2>{trades.map(t => <div key={t.id} className="p-3 bg-gray-50 rounded-lg text-center text-sm"><ShieldCheck className="h-6 w-6 text-trust-green mx-auto mb-1" />{t.productName} 거래 완료</div>)}</div>);
@@ -325,15 +397,7 @@ export const DemoClient = () => {
                 </div>
             </div>
         );
-
-        const confirmDelivery = (tradeId: number) => {
-            updateTrade({ id: tradeId, status: TradeStatus.Completed });
-        };
-
-        const withdraw = (tradeId: number) => {
-            updateTrade({ id: tradeId, status: TradeStatus.Withdrawn });
-        };
-
+        
         const myAddress = address || "";
         const myTrades = trades.filter(t => role === 'buyer' ? (t.buyer === myAddress || !t.buyer) : (t.seller === myAddress));
         const activeTrade = myTrades.find(t => t.status !== TradeStatus.Withdrawn && t.status !== TradeStatus.Created);
@@ -348,10 +412,10 @@ export const DemoClient = () => {
                     screen = role === 'buyer' ? <WaitView message={`배송 추적 중... (${activeTrade.trackingNumber})`} /> : <WaitView message="송장번호 제출을 완료하였습니다. 오라클 서비스가 곧 데이터를 업데이트 할 것입니다." />;
                     break;
                 case TradeStatus.Delivered:
-                    screen = role === 'buyer' ? <BuyerConfirmView trade={activeTrade} confirmDelivery={confirmDelivery} /> : <WaitView message="구매자의 수령 확인을 기다리고 있습니다." />;
+                    screen = role === 'buyer' ? <BuyerConfirmView trade={activeTrade} updateTrade={updateTrade} /> : <WaitView message="구매자의 수령 확인을 기다리고 있습니다." />;
                     break;
                 case TradeStatus.Completed:
-                    screen = role === 'seller' ? <SellerWithdrawView trade={activeTrade} withdraw={withdraw} /> : <CompletedTradeList trades={myTrades.filter(t => t.status === TradeStatus.Withdrawn)} />;
+                    screen = role === 'seller' ? <SellerWithdrawView trade={activeTrade} updateTrade={updateTrade} /> : <CompletedTradeList trades={myTrades.filter(t => t.status === TradeStatus.Withdrawn)} />;
                     break;
             }
         } else {
