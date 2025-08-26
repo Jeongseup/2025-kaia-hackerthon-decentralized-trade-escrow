@@ -1,197 +1,231 @@
-// ==================================================================
-// FILE: components/demo-client.tsx (신규 생성)
-// 설명: 데모의 모든 상태 관리와 UI 렌더링을 담당하는 핵심 클라이언트 컴포넌트입니다.
-// useTradeState 훅을 사용하여 브라우저 간 상태를 동기화합니다.
-// ==================================================================
+// FILE: components/demo-client.tsx (수정)
+// 설명: 새로운 Web3 시나리오에 맞춰 UI와 로직을 전면 재구성했습니다.
 "use client";
 
 import { useState } from 'react';
 import { PhoneMockup } from '@/components/phone-mockup';
 import { Button } from '@/components/ui/button';
 import { useTradeState, TradeStatus, Trade } from '@/hooks/use-trade-state';
-import { useAccount } from 'wagmi';
+import { useAccount, useWriteContract } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { Wallet, CheckCircle, Hourglass, Truck, PackageCheck, Banknote } from 'lucide-react';
+import { dteAbi, erc20Abi } from '@/lib/abi';
+import { parseEther, keccak256, stringToBytes } from 'viem';
+import { Wallet, Truck, PackageCheck, Banknote, Upload, Search, ShieldCheck, List, ShoppingBag, Landmark, RefreshCw, Hourglass } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
-// 각 역할과 거래 상태에 맞는 UI를 렌더링하는 컴포넌트
-const TradeScreen = ({ role, trade, setTrade }: { role: 'buyer' | 'seller', trade: Trade | null, setTrade: (trade: Trade | null) => void }) => {
-    if (!trade) {
-        if (role === 'buyer') {
-            return <BuyerStartView setTrade={setTrade} />;
-        }
-        return <SellerWaitView />;
-    }
+// --- 환경 변수 ---
+const dteContractAddress = process.env.NEXT_PUBLIC_DTE_CONTRACT_ADDRESS as `0x${string}`;
+const stableKrwAddress = process.env.NEXT_PUBLIC_STABLE_KRW_CONTRACT_ADDRESS as `0x${string}`;
 
-    switch (trade.status) {
-        case TradeStatus.Created:
-            return role === 'buyer' ? <DepositView trade={trade} setTrade={setTrade} /> : <SellerWaitView message="구매자의 입금을 기다리고 있습니다." />;
-        case TradeStatus.Deposited:
-            return role === 'seller' ? <SubmitTrackingView trade={trade} setTrade={setTrade} /> : <WaitView status="배송 준비 중" message="판매자가 상품을 발송하고 송장 번호를 입력할 예정입니다." />;
-        case TradeStatus.Shipping:
-             return <WaitView status="배송 중" message="오라클이 배송 상태를 추적하고 있습니다." />;
-        case TradeStatus.Delivered:
-            return role === 'buyer' ? <ConfirmDeliveryView trade={trade} setTrade={setTrade} /> : <WaitView status="수령 확인 대기" message="구매자의 상품 수령 확인을 기다리고 있습니다." />;
-        case TradeStatus.Completed:
-            return role === 'seller' ? <WithdrawView trade={trade} setTrade={setTrade} /> : <WaitView status="정산 대기 중" message="판매자가 에스크로 대금을 인출할 예정입니다." />;
-        case TradeStatus.Withdrawn:
-            return <TradeCompleteView />;
-        default:
-            return <SellerWaitView />;
-    }
-};
+// --- UI 컴포넌트 ---
 
-export const DemoClient = () => {
-const [role, setRole] = useState<'buyer' | 'seller' | null>(null);
-  const { trade, setTrade, clearTrade } = useTradeState();
-  const { isConnected, address } = useAccount();
+// Status 0: 판매자 - 상품 등록
+const SellerRegistrationView = ({ registerProduct }: { registerProduct: (product: Omit<Trade, 'id' | 'status' | 'buyer'>) => void }) => {
+    const [productName, setProductName] = useState("나이키 알파플라이 3");
+    const [amount, setAmount] = useState("250000");
+    const [imageUrl, setImageUrl] = useState("https://static.nike.com/a/images/t_PDP_936_v1/f_auto,q_auto:eco/3d5aaf55-e2c6-4b73-b981-812c887010fd/AIR+ZOOM+ALPHAFLY+NEXT%25+3+PRM.png");
 
-  // 지갑이 연결되지 않았을 때의 UI
-  const ConnectWalletView = () => (
-    <div className="flex flex-col items-center gap-4 text-white">
-        <p>데모를 시작하려면 지갑을 연결해주세요.</p>
-        <ConnectButton />
-    </div>
-  );
-
-  // 지갑 연결 후 역할 선택 UI
-  const RoleSelectionView = () => (
-    <div className="flex flex-col items-center gap-8 text-white">
-        <div className='text-center'>
-            <p className="font-bold">지갑 연결 완료!</p>
-            <p className="text-sm text-purple-200 truncate max-w-xs">{address}</p>
-        </div>
-        <div className="flex flex-col md:flex-row justify-center items-center gap-4">
-            <Button size="lg" onClick={() => setRole('buyer')} className="bg-white text-primary-purple hover:bg-white/90">구매자로 시작</Button>
-            <Button size="lg" onClick={() => setRole('seller')} className="bg-white text-secondary-purple hover:bg-white/90">판매자로 시작</Button>
-        </div>
-    </div>
-  );
-
-
-  // 역할 선택 후 실제 데모 UI
-  const DemoView = () => (
-     <div>
-      <div className="w-full max-w-sm mx-auto">
-        <h2 className="text-center font-bold text-xl mb-4 text-white">{role === 'buyer' ? '구매자 (김카카오)' : '판매자 (김라인)'}</h2>
-        <PhoneMockup>
-          <TradeScreen role={role!} trade={trade} setTrade={setTrade} />
-        </PhoneMockup>
-      </div>
-      <div className="text-center mt-6">
-        <Button onClick={() => { clearTrade(); setRole(null); }} variant="ghost" className="text-white/70 hover:text-white">데모 초기화</Button>
-      </div>
-    </div>
-  );
-  
-  if (!isConnected) {
-    return <ConnectWalletView />;
-  }
-
-  if (!role) {
-    return <RoleSelectionView />;
-  }
-
-  return <DemoView />;
-};
-
-// --- 단계별 UI 컴포넌트 ---
-
-const BuyerStartView = ({ setTrade }: { setTrade: (trade: Trade | null) => void }) => {
-    const handleCreate = () => {
-        setTrade({
-            id: 1,
-            status: TradeStatus.Created,
-            amount: 250000,
-            seller: '0xSellerAddr',
-            buyer: '0xBuyerAddr',
+    const handleRegister = () => {
+        registerProduct({
+            productName,
+            amount: Number(amount),
+            productImageUrl: imageUrl,
+            seller: "", // Hook에서 현재 지갑 주소로 채워짐
         });
     };
-    return (
-        <div className="p-4 text-center flex flex-col justify-center h-full">
-            <h2 className="font-bold text-lg mb-4">거래 시작하기</h2>
-            <p className="text-sm text-gray-500 mb-6">&apos;
-                빈티지 카메라&apos;를 250,000 KRW에 구매합니다.</p>
-            <Button onClick={handleCreate} className="w-full bg-primary-purple hover:bg-primary-purple/90"><Wallet className="mr-2 h-4 w-4" /> 거래 생성</Button>
-        </div>
-    );
-};
 
-const SellerWaitView = ({ message = "구매자가 거래를 생성하기를 기다리고 있습니다." }: { message?: string }) => (
-    <div className="p-6 text-center flex flex-col justify-center items-center h-full">
-        <Hourglass className="h-12 w-12 text-gray-400 mb-4 animate-pulse" />
-        <h2 className="font-bold text-lg mb-2">대기 중</h2>
-        <p className="text-sm text-gray-500">{message}</p>
-    </div>
-);
-
-const DepositView = ({ trade, setTrade }: { trade: Trade, setTrade: (trade: Trade | null) => void }) => {
-    const handleDeposit = () => setTrade({ ...trade, status: TradeStatus.Deposited });
     return (
-        <div className="p-4">
-            <h2 className="font-bold text-lg mb-2 text-center">대금 입금</h2>
-            <div className="bg-gray-50 p-3 rounded-lg space-y-2 text-sm mb-4">
-                <div className="flex justify-between"><span className="text-gray-500">결제 금액</span><strong className="text-primary-purple">{trade.amount.toLocaleString()} KRW</strong></div>
+        <div className="p-4 flex flex-col h-full">
+            <h2 className="font-bold text-lg mb-4 text-center">상품 등록</h2>
+            <div className="space-y-3 text-left flex-grow">
+                <input type="hidden" value={imageUrl} />
+                <div><label className="text-xs font-medium text-gray-600">상품명</label><Input value={productName} onChange={(e) => setProductName(e.target.value)} /></div>
+                <div><label className="text-xs font-medium text-gray-600">판매 금액 (KRW)</label><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
             </div>
-            <Button onClick={handleDeposit} className="w-full bg-kaia-yellow text-black hover:bg-kaia-yellow/90">카카오페이로 입금</Button>
+            <Button onClick={handleRegister} className="w-full mt-4"><Upload className="mr-2 h-4 w-4" /> 상품 등록하기</Button>
         </div>
     );
 };
 
-const SubmitTrackingView = ({ trade, setTrade }: { trade: Trade, setTrade: (trade: Trade | null) => void }) => {
-    const handleSubmit = () => {
-        // 오라클 콜백 시뮬레이션
-        setTrade({ ...trade, status: TradeStatus.Shipping });
-        setTimeout(() => {
-            setTrade({ ...trade, status: TradeStatus.Delivered });
-        }, 2000); // 2초 후 배송완료로 변경
+// Status 0 & 1: 구매자 - 상품 목록
+const BuyerProductListView = ({ trades, createTrade }: { trades: Trade[], createTrade: (tradeId: number) => void }) => (
+    <div className="p-4 h-full flex flex-col">
+        <h2 className="font-bold text-lg mb-4 text-center">상품 목록</h2>
+        {trades.length === 0 ? (
+            <WaitView message="등록된 상품이 없습니다." />
+        ) : (
+            <div className="space-y-4 overflow-y-auto">
+                {trades.map(trade => (
+                    <Card key={trade.id}>
+                        <CardHeader className="p-0"><img src={trade.productImageUrl} alt={trade.productName} className="rounded-t-lg" /></CardHeader>
+                        <CardContent className="p-3">
+                            <CardTitle className="text-base">{trade.productName}</CardTitle>
+                            <p className="text-sm text-primary-purple font-bold">{trade.amount.toLocaleString()} KRW</p>
+                        </CardContent>
+                        <CardFooter className="p-3">
+                            <Button onClick={() => createTrade(trade.id)} className="w-full"><ShoppingBag className="mr-2 h-4 w-4" /> 거래하기</Button>
+                        </CardFooter>
+                    </Card>
+                ))}
+            </div>
+        )}
+    </div>
+);
+
+// Status 1: 판매자 - 등록 상품 대시보드
+const SellerDashboardView = ({ trades }: { trades: Trade[] }) => (
+    <div className="p-4 h-full flex flex-col">
+        <h2 className="font-bold text-lg mb-4 text-center">내 판매 상품</h2>
+        <div className="space-y-2 overflow-y-auto">
+            {trades.map(trade => (
+                <div key={trade.id} className="bg-gray-50 p-3 rounded-lg text-sm">
+                    <p className="font-semibold">{trade.productName}</p>
+                    <p>{trade.amount.toLocaleString()} KRW - <Badge variant="secondary">거래 대기중</Badge></p>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
+// Status 2: 판매자 - 거래 상세 및 송장 제출
+const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submitTracking: (tradeId: number, trackingNumber: string) => void }) => {
+    const [trackingNumber, setTrackingNumber] = useState("");
+    return (
+        <div className="p-4 h-full flex flex-col">
+            <h2 className="font-bold text-lg mb-2 text-center">거래 생성됨 (ID: {trade.id})</h2>
+            <Card>
+                <CardContent className="p-3 text-sm space-y-2">
+                    <p><strong>구매자:</strong> <span className="truncate w-24">{trade.buyer}</span></p>
+                    <p><strong>배송지:</strong> {trade.deliveryAddress}</p>
+                    <p><strong>입금액:</strong> {trade.amount.toLocaleString()} KRW <Badge className="bg-trust-green">입금 확인됨</Badge></p>
+                </CardContent>
+            </Card>
+            <div className="mt-4 pt-4 border-t">
+                <label className="text-xs font-medium text-gray-600">송장 번호</label>
+                <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="1234567890" />
+                <Button onClick={() => submitTracking(trade.id, trackingNumber)} className="w-full mt-2"><Truck className="mr-2 h-4 w-4" /> 송장번호 제출하기</Button>
+            </div>
+        </div>
+    );
+};
+
+// Status 4: 구매자 - 수령 확인
+const BuyerConfirmView = ({ trade, confirmDelivery }: { trade: Trade, confirmDelivery: (tradeId: number) => void }) => (
+    <div className="p-4 text-center flex flex-col justify-center h-full">
+        <PackageCheck className="h-12 w-12 text-trust-green mb-4 mx-auto" />
+        <h2 className="font-bold text-lg mb-4">배송 완료</h2>
+        <Button onClick={() => confirmDelivery(trade.id)} className="w-full bg-trust-green hover:bg-trust-green/90">수령 확인</Button>
+    </div>
+);
+
+// Status 5: 판매자 - 인출 대기
+const SellerWithdrawView = ({ trade, withdraw }: { trade: Trade, withdraw: (tradeId: number) => void }) => (
+     <div className="p-4 text-center flex flex-col justify-center h-full">
+        <Landmark className="h-12 w-12 text-primary-purple mb-4 mx-auto" />
+        <h2 className="font-bold text-lg mb-4">정산 가능</h2>
+        <Button onClick={() => withdraw(trade.id)} className="w-full"><Banknote className="mr-2 h-4 w-4" /> 대금 인출하기</Button>
+    </div>
+);
+
+// 공통 컴포넌트
+const WaitView = ({ message }: { message: string }) => (<div className="p-6 text-center flex flex-col justify-center items-center h-full"><Hourglass className="h-12 w-12 text-gray-400 mb-4 animate-pulse" /><h2 className="font-bold text-lg mb-2">대기 중</h2><p className="text-sm text-gray-500">{message}</p></div>);
+const CompletedTradeList = ({ trades }: { trades: Trade[] }) => (<div className="p-4"><h2 className="font-bold text-lg mb-4 text-center">완료된 거래</h2>{trades.map(t => <div key={t.id} className="p-3 bg-gray-50 rounded-lg text-center text-sm"><ShieldCheck className="h-6 w-6 text-trust-green mx-auto mb-1" />{t.productName} 거래 완료</div>)}</div>);
+
+
+// --- 메인 클라이언트 컴포넌트 ---
+export const DemoClient = () => {
+    const [role, setRole] = useState<'buyer' | 'seller' | null>(null);
+    const { trades, registerProduct, updateTrade, clearAll } = useTradeState();
+    const { isConnected, address } = useAccount();
+    const { writeContract } = useWriteContract();
+
+    const createTrade = (tradeId: number) => {
+        const trade = trades.find(t => t.id === tradeId);
+        if (!trade) return;
+        const deliveryAddress = "서울시 강남구 테헤란로 123";
+        const deliveryAddressHash = keccak256(stringToBytes(deliveryAddress));
+        
+        console.log(`Creating trade for ID ${tradeId}`);
+        updateTrade({ ...trade, status: TradeStatus.Deposited, buyer: address || "0xBuyer", deliveryAddress, deliveryAddressHash });
     };
-    return (
-        <div className="p-4">
-            <h2 className="font-bold text-lg mb-4 text-center">송장 번호 입력</h2>
-            <p className="text-sm text-center text-gray-500 mb-4">구매자의 입금이 확인되었습니다. 상품을 발송하고 송장번호를 입력하세요.</p>
-            <Button onClick={handleSubmit} className="w-full bg-primary-purple hover:bg-primary-purple/90"><Truck className="mr-2 h-4 w-4" /> 송장 제출 (시뮬레이션)</Button>
-        </div>
-    );
+    
+    const submitTracking = (tradeId: number, trackingNumber: string) => {
+        console.log(`Submitting tracking# ${trackingNumber} for trade ${tradeId}`);
+        updateTrade({ ...trades.find(t => t.id === tradeId)!, status: TradeStatus.Shipping, trackingNumber });
+        setTimeout(() => {
+            updateTrade({ ...trades.find(t => t.id === tradeId)!, status: TradeStatus.Delivered, trackingNumber });
+        }, 2000);
+    };
+
+    const confirmDelivery = (tradeId: number) => {
+        console.log(`Confirming delivery for trade ${tradeId}`);
+        updateTrade({ ...trades.find(t => t.id === tradeId)!, status: TradeStatus.Completed });
+    };
+
+    const withdraw = (tradeId: number) => {
+        console.log(`Withdrawing funds for trade ${tradeId}`);
+        updateTrade({ ...trades.find(t => t.id === tradeId)!, status: TradeStatus.Withdrawn });
+    };
+
+    const renderContent = () => {
+        if (!isConnected) return <div className="flex flex-col items-center gap-4 text-white"><p>데모를 시작하려면 지갑을 연결해주세요.</p><ConnectButton /></div>;
+        if (!role) return (
+            <div className="flex flex-col items-center gap-8 text-white">
+                <div className='text-center'><p className="font-bold">지갑 연결 완료!</p><p className="text-sm text-purple-200 truncate max-w-xs">{address}</p></div>
+                <div className="flex flex-col md:flex-row justify-center items-center gap-4">
+                    <Button size="lg" onClick={() => setRole('buyer')} className="bg-white text-primary-purple hover:bg-white/90">구매자로 시작</Button>
+                    <Button size="lg" onClick={() => setRole('seller')} className="bg-white text-secondary-purple hover:bg-white/90">판매자로 시작</Button>
+                </div>
+            </div>
+        );
+
+        const myAddress = address || "";
+        const myTrades = trades.filter(t => role === 'buyer' ? (t.buyer === myAddress) : (t.seller === myAddress));
+        const activeTrade = myTrades.find(t => t.status !== TradeStatus.Withdrawn && t.status !== TradeStatus.Created);
+        
+        let screen;
+        if (activeTrade) {
+            // 진행 중인 거래가 있을 때 (Created 상태 제외)
+            switch (activeTrade.status) {
+                case TradeStatus.Deposited:
+                    screen = role === 'seller' ? <SellerTradeDetailView trade={activeTrade} submitTracking={submitTracking} /> : <WaitView message="판매자가 상품을 발송할 예정입니다." />;
+                    break;
+                case TradeStatus.Shipping:
+                    screen = role === 'buyer' ? <WaitView message={`배송 추적 중... (${activeTrade.trackingNumber})`} /> : <WaitView message="상품이 배송 중입니다." />;
+                    break;
+                case TradeStatus.Delivered:
+                    screen = role === 'buyer' ? <BuyerConfirmView trade={activeTrade} confirmDelivery={confirmDelivery} /> : <WaitView message="구매자의 수령 확인을 기다리고 있습니다." />;
+                    break;
+                case TradeStatus.Completed:
+                    screen = role === 'seller' ? <SellerWithdrawView trade={activeTrade} withdraw={withdraw} /> : <CompletedTradeList trades={myTrades.filter(t => t.status === TradeStatus.Withdrawn)} />;
+                    break;
+            }
+        } else {
+            // 진행 중인 거래가 없을 때
+            if (role === 'seller') {
+                const myRegisteredItems = trades.filter(t => t.seller === myAddress && t.status === TradeStatus.Created);
+                screen = myRegisteredItems.length > 0 ? <SellerDashboardView trades={myRegisteredItems} /> : <SellerRegistrationView registerProduct={registerProduct} />;
+            } else { // buyer
+                const availableItems = trades.filter(t => t.status === TradeStatus.Created);
+                screen = <BuyerProductListView trades={availableItems} createTrade={createTrade} />;
+            }
+        }
+        
+        return (
+            <div>
+                <div className="w-full max-w-sm mx-auto">
+                    <h2 className="text-center font-bold text-xl mb-4 text-white">{role === 'buyer' ? '구매자' : '판매자'}</h2>
+                    <PhoneMockup>{screen}</PhoneMockup>
+                </div>
+                <div className="text-center mt-6 flex justify-center items-center gap-4">
+                    <Button onClick={() => setRole(null)} variant="ghost" className="text-white/70 hover:text-white">역할 재선택</Button>
+                    <Button onClick={() => { clearAll(); setRole(null); }} variant="ghost" className="text-white/70 hover:text-white"><RefreshCw className="mr-2 h-4 w-4" /> 데모 초기화</Button>
+                </div>
+            </div>
+        );
+    };
+  
+    return renderContent();
 };
-
-const ConfirmDeliveryView = ({ trade, setTrade }: { trade: Trade, setTrade: (trade: Trade | null) => void }) => {
-    const handleConfirm = () => setTrade({ ...trade, status: TradeStatus.Completed });
-    return (
-        <div className="p-4 text-center flex flex-col justify-center h-full">
-            <PackageCheck className="h-12 w-12 text-trust-green mb-4" />
-            <h2 className="font-bold text-lg mb-4">배송 완료</h2>
-            <p className="text-sm text-gray-500 mb-6">상품을 잘 받으셨나요? 수령 확인을 눌러 거래를 완료하세요.</p>
-            <Button onClick={handleConfirm} className="w-full bg-trust-green hover:bg-trust-green/90">수령 확인</Button>
-        </div>
-    );
-};
-
-const WithdrawView = ({ trade, setTrade }: { trade: Trade, setTrade: (trade: Trade | null) => void }) => {
-    const handleWithdraw = () => setTrade({ ...trade, status: TradeStatus.Withdrawn });
-    return (
-        <div className="p-4 text-center flex flex-col justify-center h-full">
-            <Banknote className="h-12 w-12 text-primary-purple mb-4" />
-            <h2 className="font-bold text-lg mb-4">정산 가능</h2>
-            <p className="text-sm text-gray-500 mb-6">구매자가 수령을 확인했습니다. 판매 대금을 인출하세요.</p>
-            <Button onClick={handleWithdraw} className="w-full bg-primary-purple hover:bg-primary-purple/90">대금 인출하기</Button>
-        </div>
-    );
-};
-
-const WaitView = ({ status, message }: { status: string, message: string }) => (
-    <div className="p-6 text-center flex flex-col justify-center items-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-purple mb-4"></div>
-        <h2 className="font-bold text-lg mb-2">{status}</h2>
-        <p className="text-sm text-gray-500">{message}</p>
-    </div>
-);
-
-const TradeCompleteView = () => (
-    <div className="p-6 text-center flex flex-col justify-center items-center h-full">
-        <CheckCircle className="h-16 w-16 text-trust-green mb-4" />
-        <h2 className="font-bold text-lg mb-2">거래 성공</h2>
-        <p className="text-sm text-gray-500">모든 거래 절차가 안전하게 완료되었습니다.</p>
-    </div>
-);
-
-

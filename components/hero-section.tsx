@@ -10,10 +10,10 @@ export const HeroSection = () => {
           스마트 컨트랙트 기반 에스크로 DTE로 중고거래 사기 위험을 없애고, 판매자와 구매자 모두를 보호하세요.
         </p>
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-          <Button size="lg" asChild className="bg-kaia-yellow text-gray-900 font-bold hover:bg-kaia-yellow/90 text-lg px-8 py-6 w-full sm:w-auto">
+          <Button size="lg" variant="outline" asChild className="border-2 border-white text-primary-purple font-bold hover:bg-white text-lg px-8 py-6 w-full sm:w-auto">
             <Link href="/demo">데모 체험하기</Link>
           </Button>
-          <Button size="lg" variant="outline" asChild className="border-2 border-white text-white font-bold hover:bg-white hover:text-primary-purple text-lg px-8 py-6 w-full sm:w-auto">
+          <Button size="lg" variant="outline" asChild className="border-2 border-white text-primary-purple font-bold hover:bg-white text-lg px-8 py-6 w-full sm:w-auto">
             <Link href="#">API 문서 보기</Link>
           </Button>
         </div>

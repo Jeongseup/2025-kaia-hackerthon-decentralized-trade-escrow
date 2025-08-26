@@ -1,8 +1,8 @@
 // FILE: app/demo/page.tsx (전면 수정)
 // 설명: Web3 데모를 위한 기본 레이아웃을 설정하고, 클라이언트 컴포넌트를 불러옵니다.
 // 서버 컴포넌트로 유지하여 초기 로딩 성능을 확보합니다.
-import { DemoClient } from "@/components/demo-client";
 import { Header } from "@/components/header";
+import { DemoClient } from "@/components/demo-client";
 
 export default function DemoPage() {
   return (
@@ -16,7 +16,6 @@ export default function DemoPage() {
               두 개의 브라우저 창을 열어 한쪽은 구매자, 다른 한쪽은 판매자로 시작해보세요.
             </p>
           </div>
-          {/* 모든 인터랙션 로직은 DemoClient 컴포넌트에서 처리합니다. */}
           <DemoClient />
         </div>
       </main>

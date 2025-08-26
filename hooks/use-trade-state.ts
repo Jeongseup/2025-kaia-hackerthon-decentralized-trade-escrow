@@ -1,76 +1,83 @@
-// ==================================================================
-// FILE: hooks/use-trade-state.ts (수정)
-// 설명: 'any' 타입을 명확한 'Trade' 타입으로 변경하여 타입 안정성을 높였습니다.
-// ==================================================================
 import { useState, useEffect, useCallback } from "react";
+import { useAccount } from "wagmi";
 
-// 스마트 컨트랙트의 TradeStatus와 동일한 enum
 export enum TradeStatus {
-  Created,
-  Deposited,
-  Shipping,
-  Delivered,
-  Completed,
-  Withdrawn,
-  Canceled,
-  Disputed,
+  Created, // 0: 판매자가 상품 등록. 구매 대기
+  Deposited, // 1: 구매자가 거래 생성 및 입금 완료
+  Shipping, // 2: 판매자가 송장 입력
+  Delivered, // 3: 오라클이 배송 완료 확인
+  Completed, // 4: 구매자가 수령 확인
+  Withdrawn, // 5: 판매자가 정산 완료
 }
 
-// 1. 거래 데이터 구조에 대한 타입을 명확하게 정의합니다.
-// 이렇게 하면 trade 객체의 속성에 접근할 때 자동 완성과 타입 체크의 이점을 얻을 수 있습니다.
+// 아이템과 거래 정보를 하나의 인터페이스로 통합
 export interface Trade {
   id: number;
   status: TradeStatus;
   amount: number;
   seller: string;
-  buyer: string;
+  productName: string;
+  productImageUrl: string;
+  buyer?: string; // 거래 생성 전에는 비어있음
+  deliveryAddress?: string;
+  deliveryAddressHash?: `0x${string}`;
+  trackingNumber?: string;
 }
 
-const STORAGE_KEY = "dte-trade-demo";
+const TRADES_STORAGE_KEY = "dte-trades-demo-v2";
 
 export const useTradeState = () => {
-  // 2. useState의 제네릭 타입으로 'any' 대신 정의한 'Trade' 타입을 사용합니다.
-  const [trade, setTrade] = useState<Trade | null>(() => {
-    if (typeof window === "undefined") return null;
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    // 저장된 데이터가 있을 경우, JSON 파싱 후 Trade 타입으로 간주합니다.
-    return stored ? (JSON.parse(stored) as Trade) : null;
+  const { address } = useAccount();
+
+  const [trades, setTrades] = useState<Trade[]>(() => {
+    if (typeof window === "undefined") return [];
+    const stored = window.localStorage.getItem(TRADES_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
   });
 
   const handleStorageChange = useCallback((event: StorageEvent) => {
-    if (event.key === STORAGE_KEY) {
-      const newValue = event.newValue;
-      setTrade(newValue ? (JSON.parse(newValue) as Trade) : null);
+    if (event.key === TRADES_STORAGE_KEY) {
+      setTrades(event.newValue ? JSON.parse(event.newValue) : []);
     }
   }, []);
 
   useEffect(() => {
     window.addEventListener("storage", handleStorageChange);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-    };
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, [handleStorageChange]);
 
-  // 3. 함수 파라미터의 타입도 'any' 대신 'Trade' 타입으로 명시합니다.
-  const updateTradeState = (newTradeState: Trade | null) => {
-    setTrade(newTradeState);
-    if (newTradeState) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(newTradeState));
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  };
-
-  const clearTrade = () => {
-    updateTradeState(null);
-    // 다른 탭에도 즉시 반영되도록 이벤트를 수동으로 발생
+  const updateTrades = (newTrades: Trade[]) => {
+    setTrades(newTrades);
+    window.localStorage.setItem(TRADES_STORAGE_KEY, JSON.stringify(newTrades));
+    // 다른 탭/창에 변경사항을 즉시 알리기 위해 이벤트를 수동으로 발생시킵니다.
     window.dispatchEvent(
       new StorageEvent("storage", {
-        key: STORAGE_KEY,
-        newValue: null,
+        key: TRADES_STORAGE_KEY,
+        newValue: JSON.stringify(newTrades),
       })
     );
   };
 
-  return { trade, setTrade: updateTradeState, clearTrade };
+  const registerProduct = (product: Omit<Trade, "id" | "status" | "buyer">) => {
+    const newTrade: Trade = {
+      id: Date.now(),
+      status: TradeStatus.Created,
+      ...product,
+      seller: address || "0xSeller",
+    };
+    updateTrades([...trades, newTrade]);
+  };
+
+  const updateTrade = (updatedTrade: Partial<Trade> & { id: number }) => {
+    const newTrades = trades.map((t) =>
+      t.id === updatedTrade.id ? { ...t, ...updatedTrade } : t
+    );
+    updateTrades(newTrades);
+  };
+
+  const clearAll = () => {
+    updateTrades([]);
+  };
+
+  return { trades, registerProduct, updateTrade, clearAll };
 };
