@@ -23,7 +23,7 @@ export const FeaturesSection = () => {
               </svg>
             </div>
             <h3 className="text-xl font-semibold mb-2">자동화된 배송 추적</h3>
-            <p className="text-gray-600">오라클이 택배사 API와 연동하여 배송 상태를 자동으로 추적하고, '배송 완료' 시 정산 절차를 진행합니다.</p>
+            <p className="text-gray-600">오라클이 택배사 API와 연동하여 배송 상태를 자동으로 추적하고, &apos;배송 완료&apos; 시 정산 절차를 진행합니다.</p>
           </div>
           <div className="bg-gray-50 p-8 rounded-xl text-center hover:shadow-xl hover:-translate-y-2 transition-all">
             <div className="bg-purple-100 text-primary-purple rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
