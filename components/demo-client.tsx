@@ -23,7 +23,9 @@ const dteContractAddress = process.env.NEXT_PUBLIC_DTE_CONTRACT_ADDRESS as `0x${
 const stableKrwAddress = process.env.NEXT_PUBLIC_STABLE_KRW_CONTRACT_ADDRESS as `0x${string}`;
 const buyerDeliveryAddress = "서울시 강남구 테헤란로 123";
 const buyerDeliveryAddressHash = keccak256(stringToBytes(buyerDeliveryAddress));
-
+const itemName = "나이키 알파플라이 3";
+const itemPrice = 10; // KRW
+const itemImageUrl = "https://static.nike.com/a/images/t_PDP_936_v1/f_auto,q_auto:eco/3d5aaf55-e2c6-4b73-b981-812c887010fd/AIR+ZOOM+ALPHAFLY+NEXT%25+3+PRM.png";
 // --- 타입 정의 ---
 type TradeCreatedEventLog = Log & {
   args: {
@@ -34,15 +36,11 @@ type TradeCreatedEventLog = Log & {
 // --- UI 컴포넌트 ---
 
 const SellerRegistrationView = ({ registerProduct }: { registerProduct: (product: Omit<Trade, 'id' | 'status' | 'buyer'>) => void }) => {
-    const [productName, setProductName] = useState("나이키 알파플라이 3");
-    const [amount, setAmount] = useState("250000");
-    const imageUrl = "https://static.nike.com/a/images/t_PDP_936_v1/f_auto,q_auto:eco/3d5aaf55-e2c6-4b73-b981-812c887010fd/AIR+ZOOM+ALPHAFLY+NEXT%25+3+PRM.png";
-
-    const handleRegister = () => {
+      const handleRegister = () => {
         registerProduct({
-            productName,
-            amount: Number(amount),
-            productImageUrl: imageUrl,
+            productName: itemName,
+            amount: itemPrice,
+            productImageUrl: itemImageUrl,
             seller: "",
         });
     };
@@ -51,8 +49,8 @@ const SellerRegistrationView = ({ registerProduct }: { registerProduct: (product
         <div className="p-4 flex flex-col h-full">
             <h2 className="font-bold text-lg mb-4 text-center">상품 등록</h2>
             <div className="space-y-3 text-left flex-grow">
-                <div><label className="text-xs font-medium text-gray-600">상품명</label><Input value={productName} onChange={(e) => setProductName(e.target.value)} /></div>
-                <div><label className="text-xs font-medium text-gray-600">판매 금액 (KRW)</label><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+                <div><label className="text-xs font-medium text-gray-600">상품명</label><Input value={itemName} /></div>
+                <div><label className="text-xs font-medium text-gray-600">판매 금액 (KRW)</label><Input type="number" value={itemPrice} /></div>
             </div>
             <Button onClick={handleRegister} className="w-full mt-4"><Upload className="mr-2 h-4 w-4" /> 상품 등록하기</Button>
         </div>
@@ -78,58 +76,80 @@ const BuyerProductListView = ({ trades, updateTrade, replaceTradeId }: { trades:
         setIsLoading(true);
 
         try {
-            // Step 1: Create Trade and get the real tradeId from event
-            toast.info("1/4: 거래 생성 중...", { description: "블록체인에 거래를 기록하고 있습니다." });
-            const txHash = await createTradeAsync({
+            // --- Step 1: Create Trade ---
+            toast.info("1/6: 거래 생성 요청", { description: "지갑에서 트랜잭션에 서명해주세요." });
+            const createTxHash = await createTradeAsync({
                 address: dteContractAddress,
                 abi: dteAbi,
                 functionName: 'createTrade',
                 args: [trade.seller as `0x${string}`, parseEther(trade.amount.toString()), buyerDeliveryAddressHash],
             });
 
-            toast.info("2/4: 거래 ID 확인 중...", { description: "블록체인에서 트랜잭션 영수증을 기다립니다." });
-            const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+            // --- Step 2: Wait for Create Trade Receipt ---
+            toast.info("2/6: 거래 생성 확인 중...", { description: "블록체인에서 트랜잭션이 처리되기를 기다립니다." });
+            const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createTxHash });
+            if (createReceipt.status === 'reverted') throw new Error("거래 생성 트랜잭션이 실패했습니다.");
+            
             const logs = parseEventLogs({
               abi: dteAbi,
-              logs: receipt.logs,
+              logs: createReceipt.logs,
               eventName: "TradeCreated",
             }) as TradeCreatedEventLog[];
 
             if (logs.length === 0 || !logs[0].args.tradeId) {
-              throw new Error(
-                "TradeCreated 이벤트를 찾을 수 없거나 tradeId가 없습니다."
-              );
+              throw new Error("TradeCreated 이벤트를 찾을 수 없거나 tradeId가 없습니다.");
             }
             const onChainTradeId = Number(logs[0].args.tradeId);
-            
-            // 로컬 ID를 온체인 ID로 교체
+            console.log("온체인 거래 ID:", onChainTradeId);
             replaceTradeId(localTradeId, onChainTradeId);
 
-            // Step 2: Approve Tokens
-            toast.info("3/4: 토큰 사용 승인", { description: "DTE 컨트랙트가 자금을 사용할 수 있도록 승인합니다." });
-            await approveAsync({
+            // --- Step 3: Approve Tokens ---
+            toast.info("3/6: 토큰 사용 승인 요청", { description: "지갑에서 토큰 사용 승인에 서명해주세요." });
+            const approveTxHash = await approveAsync({
                 address: stableKrwAddress,
                 abi: erc20Abi,
                 functionName: 'approve',
                 args: [dteContractAddress, parseEther(trade.amount.toString())],
             });
 
-            // Step 3: Deposit Funds
-            toast.info("4/4: 에스크로 입금", { description: "승인된 자금을 안전하게 에스크로로 보냅니다." });
-            await depositAsync({
+            // --- Step 4: Wait for Approve Receipt ---
+            toast.info("4/6: 토큰 사용 승인 확인 중...", { description: "블록체인에서 승인 처리를 기다립니다." });
+            const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+            if (approveReceipt.status === 'reverted') throw new Error("토큰 사용 승인 트랜잭션이 실패했습니다.");
+
+            // --- Step 5: Deposit Funds ---
+            toast.info("5/6: 에스크로 입금 요청", { description: "지갑에서 입금 트랜잭션에 서명해주세요." });
+            const depositTxHash = await depositAsync({
                 address: dteContractAddress,
                 abi: dteAbi,
                 functionName: 'deposit',
                 args: [BigInt(onChainTradeId)],
             });
 
-            // Final Step: Update local state
-            toast.success("거래 성공!", { description: "안전 거래가 성공적으로 생성되었습니다." });
-            updateTrade({ id: onChainTradeId, status: TradeStatus.Deposited, buyer: address || "0xBuyer", deliveryAddress: buyerDeliveryAddress, deliveryAddressHash: buyerDeliveryAddressHash });
+            // --- Step 6: Wait for Deposit Receipt ---
+            toast.info("6/6: 에스크로 입금 확인 중...", { description: "블록체인에서 입금 처리를 기다립니다." });
+            const depositReceipt = await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+            if (depositReceipt.status === 'reverted') throw new Error("에스크로 입금 트랜잭션이 실패했습니다.");
+
+            // --- Final Step: Update local state ---
+          toast.success("거래 성공!", { description: "안전 거래가 성공적으로 생성되었습니다." });
+          
+          let updatedTrade = trade;
+          updatedTrade = { ...updatedTrade, id: onChainTradeId, status: TradeStatus.Deposited, buyer: address || "0xBuyer", deliveryAddress: buyerDeliveryAddress, deliveryAddressHash: buyerDeliveryAddressHash };
+          console.log("update trade: ", updatedTrade);
+          updateTrade(updatedTrade);
 
         } catch (error) {
             console.error("Transaction failed:", error);
-            toast.error("오류 발생", { description: `트랜잭션에 실패했습니다: ${error instanceof Error ? error.message : String(error)}` });
+            let errorMessage = "알 수 없는 오류가 발생했습니다.";
+            if (error instanceof Error) {
+                if (error.message.includes("User denied transaction signature")) {
+                    errorMessage = "사용자가 지갑에서 서명을 거부하여 거래가 취소되었습니다.";
+                } else {
+                    errorMessage = `트랜잭션 처리 중 오류가 발생했습니다: ${error.message}`;
+                }
+            }
+            toast.error("오류 발생", { description: errorMessage });
         } finally {
             setIsLoading(false);
             setCurrentTargetId(null);
