@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "npm run copy-abi && next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "copy-rr-contract-abi": "npx copyfiles -u 3 contracts/out/RequestAndResponse.sol/RequestResponseConsumer.json lib/abis/",
-    "forge:build": "cd contracts && forge build && npm run copy-rr-contract-abi"
+    "copy-abi": "npx copyfiles -u 3 contracts/out/DecentralizedTradeEscrow.sol/DecentralizedTradeEscrow.json lib/contracts/ && npx copyfiles -u 3 contracts/out/StableKRW.sol/StableKRW.json lib/contracts/",
+    "forge:build": "cd contracts && forge build && npm run copy-abi"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.7",
