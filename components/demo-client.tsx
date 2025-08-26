@@ -27,8 +27,8 @@ const itemName = "나이키 알파플라이 3";
 const itemPrice = 10; // KRW
 const itemImageUrl = "https://static.nike.com/a/images/t_PDP_936_v1/f_auto,q_auto:eco/3d5aaf55-e2c6-4b73-b981-812c887010fd/AIR+ZOOM+ALPHAFLY+NEXT%25+3+PRM.png";
 const deliveryTrackingNumber = "6896724158888";
-const accID = process.env.NEXT_PUBLIC_ACC_ID;
-const callbackGasLimit = "500000";
+const accID = 1146;
+const callbackGasLimit = 500000;
 
 // --- 타입 정의 ---
 type TradeCreatedEventLog = Log & {

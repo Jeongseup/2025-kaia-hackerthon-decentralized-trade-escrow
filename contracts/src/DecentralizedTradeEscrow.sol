@@ -236,7 +236,6 @@ contract DecentralizedTradeEscrow is
             bytes(_trackingNumber).length > 0,
             "DTE: Tracking number cannot be empty"
         );
-        require(deliveryTrackingJobId != bytes32(0), "DTE: Job ID not set");
         require(
             bytes(s_trackingApiKey).length > 0,
             "DTE: Tracking API key not set"
@@ -244,6 +243,8 @@ contract DecentralizedTradeEscrow is
 
         trade.trackingNumber = _trackingNumber;
 
+        bytes32 jobId = keccak256(abi.encodePacked("uint128"));
+        uint8 numSubmission = 1;
         string memory url = string.concat(
             "https://info.sweettracker.co.kr/api/v1/trackingInfo?t_code=01&t_invoice=",
             _trackingNumber,
@@ -251,11 +252,16 @@ contract DecentralizedTradeEscrow is
             s_trackingApiKey
         );
 
-        Orakl.Request memory req = buildRequest(deliveryTrackingJobId);
+        Orakl.Request memory req = buildRequest(jobId);
         req.add("get", url);
         req.add("path", "level");
 
-        requestId = COORDINATOR.requestData(req, _callbackGasLimit, _accId, 1);
+        requestId = COORDINATOR.requestData(
+            req,
+            _callbackGasLimit,
+            _accId,
+            numSubmission
+        );
 
         requestToTradeId[requestId] = _tradeId;
         trade.status = TradeStatus.Shipping;
