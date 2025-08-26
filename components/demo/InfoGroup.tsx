@@ -1,4 +1,4 @@
-import { Input } from "./ui/input";
+import { Input } from "../ui/input";
 
 // onChange 핸들러 타입을 string 값만 처리하도록 변경
 interface InputGroupProps {
