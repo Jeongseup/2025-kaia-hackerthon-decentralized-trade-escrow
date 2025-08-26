@@ -19,8 +19,9 @@ contract DeployAll is Script {
         address buyerAddress = vm.envAddress("BUYER_ADDRESS");
         address sellerAddress = vm.envAddress("SELLER_ADDRESS");
         uint256 deployerPrivateKey = vm.envUint("OWNER_PRIVATE_KEY");
-        uint256 mintAmount = 1_000_000 * 1e18; // Mint 1,000,000 SKRW
-        uint256 tradeAmount = 10_000 * 1e18; // Trading 10,000 SKRW
+        string memory trackingApiKey = vm.envString("TRACKING_API_KEY");
+        uint256 mintAmount = 1_000_000_000 * 1e18; // Mint 1,000,000 SKRW
+        uint256 tradeAmount = 1_000_000_000 * 1e18; // Trading 10,000 SKRW
 
         // Input validation
         require(
@@ -31,6 +32,10 @@ contract DeployAll is Script {
         require(buyerAddress != address(0), "BUYER_ADDRESS must be set");
         require(sellerAddress != address(0), "SELLER_ADDRESS must be set");
         require(deployerPrivateKey != 0, "OWNER_PRIVATE_KEY must be set");
+        require(
+            bytes(trackingApiKey).length > 0,
+            "TRACKING_API_KEY must be set"
+        );
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -45,7 +50,8 @@ contract DeployAll is Script {
         DecentralizedTradeEscrow decentralizedTradeEscrow = new DecentralizedTradeEscrow(
                 address(stableKRW),
                 coordinatorAddress,
-                initialOwner
+                initialOwner,
+                trackingApiKey
             );
         console.log(
             "DecentralizedTradeEscrow deployed at:",

@@ -38,7 +38,8 @@ contract DecentralizedTradeEscrowTest is Test {
         dte = new DecentralizedTradeEscrow(
             address(stableKRW),
             address(mockCoordinator),
-            owner
+            owner,
+            "dummy_key"
         );
         dte.setDeliveryTrackingJobId(DELIVERY_JOB_ID);
         // The mock coordinator needs to know which contract to call back (_fulfill)

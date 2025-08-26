@@ -203,6 +203,36 @@ const SellerDashboardView = ({ trades }: { trades: Trade[] }) => (
 
 const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submitTracking: (tradeId: number, trackingNumber: string) => void }) => {
     const [trackingNumber, setTrackingNumber] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const { writeContractAsync: submitTrackingAsync } = useWriteContract();
+    const publicClient = usePublicClient();
+
+    const handleSubmit = async () => {
+        if (!trackingNumber || !publicClient) return;
+        setIsLoading(true);
+        toast.info("송장 정보 제출 중...", { description: "블록체인에 송장 정보를 기록합니다." });
+
+        try {
+            const txHash = await submitTrackingAsync({
+                address: dteContractAddress,
+                abi: dteAbi,
+                functionName: 'submitTrackingInfo',
+                args: [BigInt(trade.id), trackingNumber, BigInt(0), 100000], // accId와 callbackGasLimit은 데모용 값
+            });
+
+            await publicClient.waitForTransactionReceipt({ hash: txHash });
+            toast.success("송장 정보 제출 완료!");
+            submitTracking(trade.id, trackingNumber);
+
+        } catch (error) {
+            let errorMessage = "알 수 없는 오류가 발생했습니다.";
+            if (error instanceof Error) errorMessage = error.message.includes("User denied") ? "사용자가 서명을 거부했습니다." : error.message;
+            toast.error("오류 발생", { description: errorMessage });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="p-4 h-full flex flex-col">
             <h2 className="font-bold text-lg mb-2 text-center">거래 생성됨 (ID: {trade.id})</h2>
@@ -216,7 +246,10 @@ const SellerTradeDetailView = ({ trade, submitTracking }: { trade: Trade, submit
             <div className="mt-4 pt-4 border-t">
                 <label className="text-xs font-medium text-gray-600">송장 번호</label>
                 <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="1234567890" />
-                <Button onClick={() => submitTracking(trade.id, trackingNumber)} className="w-full mt-2"><Truck className="mr-2 h-4 w-4" /> 송장번호 제출하기</Button>
+                <Button onClick={handleSubmit} disabled={isLoading} className="w-full mt-2">
+                    <Truck className="mr-2 h-4 w-4" /> 
+                    {isLoading ? '제출 중...' : '송장번호 제출하기'}
+                </Button>
             </div>
         </div>
     );
