@@ -1,6 +1,14 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 2025-kaia-hackerthon-decentralized-trade-escrow, Trustless Trade
 
-## Getting Started
+## Service Overview
+
+**Pay Trustless, Trade Real.**
+
+Kaia KRW Stablecoin 기반 C2C 실물거래 혁신 프로토콜.
+
+C2C 중고거래, 신뢰와 정산이 항상 문제입니다. Trustless Trade는 카이아 체인, 원화 스테이블 코인, 카카오 페이 3가지를 기반으로 기존 중고거래의 문제점들을 해결합니다.
+
+## Getting Started This Dapp
 
 First, run the development server:
 
@@ -34,3 +42,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Learn Contract Logis
+
+You can explorer fountry project to understand this application logic and overview about it into [contracts](./contracts/README.md).
