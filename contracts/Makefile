@@ -12,8 +12,18 @@ SELLER_ADDRESS ?= ""
 
 help:
 	@echo "Usage:"
-	@echo "  make deploy 					Deploy all contracts"
-	@echo "  make deploy-escrow 				Deploy the DecentralizedTradeEscrow contract"
+	@echo "  make deploy 			Deploy all contracts"
+	@echo "  make deploy-escrow 			Deploy the DecentralizedTradeEscrow contract"
+	@echo "  make check-balance 			Check balances"
+	@echo "  make check-trades 			Check trades"
+	@echo "  make submit-tracking-info 		Submit tracking information"
+	@echo "  make create-trade-and-deposit-token 	Create trade and deposit token"
+	@echo "  make confirm-delivery 		Confirm delivery"
+	@echo "  make withdraw 			Withdraw funds"
+	@echo "  make build 			Build contracts"
+	@echo "  make test 			Run tests"
+	@echo "  make clean 			Clean build artifacts"
+	@echo "  make fmt 			Format solidity files"
 
 .PHONY: deploy check-balance
 deploy: deploy-escrow
@@ -64,7 +74,7 @@ submit-tracking-info:
 	@forge script script/SubmitTrackingInfo.s.sol:SubmitTrackingInfoScript \
 		--rpc-url $(RPC_URL) \
 		--broadcast \
-		-vvvv
+		-v
 
 create-trade-and-deposit-token:
 	@echo "Creating and depositing trade..."
@@ -72,6 +82,7 @@ create-trade-and-deposit-token:
 		--rpc-url $(RPC_URL) \
 		--broadcast \
 		-v
+
 
 confirm-delivery:
 	@forge script script/ConfirmDelivery.s.sol:ConfirmDeliveryScript \
@@ -85,3 +96,24 @@ withdraw:
 		--rpc-url $(RPC_URL) \
 		--broadcast \
 		-v
+
+
+.PHONY: build
+build:
+	@echo "Building contracts..."
+	@forge build
+
+.PHONY: test
+test:
+	@echo "Running tests..."
+	@forge test
+
+.PHONY: clean
+clean:
+	@echo "Cleaning build artifacts..."
+	@forge clean
+
+.PHONY: fmt
+fmt:
+	@echo "Formatting solidity files..."
+	@forge fmt

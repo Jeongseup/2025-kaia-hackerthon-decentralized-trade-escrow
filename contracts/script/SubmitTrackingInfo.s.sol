@@ -21,23 +21,18 @@ contract SubmitTrackingInfoScript is Script {
 
         uint256 sellerPrivateKey = vm.envUint("SELLER_PRIVATE_KEY");
         uint256 tradeId = vm.envUint("TRADE_ID");
+        string memory trackingNumber = vm.envString("TRACKING_NUMBER");
 
         vm.startBroadcast(sellerPrivateKey);
-
         DecentralizedTradeEscrow dte = DecentralizedTradeEscrow(dteAddress);
-
-        // Placeholder values - replace with actual data
-        string memory trackingNumber = "6896724158888"; // Example tracking number
         uint64 accId = 1146; // Example accId
         uint32 callbackGasLimit = 500_000; // Example callback gas limit
-
         dte.submitTrackingInfo(
             tradeId,
             trackingNumber,
             accId,
             callbackGasLimit
         );
-
         vm.stopBroadcast();
     }
 }
