@@ -229,6 +229,7 @@ const SellerTradeDetailView = ({ trade, updateTrade }: { trade: Trade, updateTra
         setIsLoading(true);
         toast.info("송장 정보 제출 중...", { description: "블록체인에 송장 정보를 기록합니다." });
         try {
+            console.log("submit info",BigInt(trade.id), trackingNumber)
             const txHash = await submitTrackingAsync({
                 address: dteContractAddress,
                 abi: dteAbi,
