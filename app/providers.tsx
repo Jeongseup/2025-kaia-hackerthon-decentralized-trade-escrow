@@ -43,6 +43,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
+{/* 3. RainbowKitProvider에 생성한 커스텀 테마를 전달합니다. */}
         <RainbowKitProvider>
           {children}
         </RainbowKitProvider>

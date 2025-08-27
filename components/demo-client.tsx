@@ -24,9 +24,8 @@ const stableKrwAddress = process.env.NEXT_PUBLIC_STABLE_KRW_CONTRACT_ADDRESS as 
 const buyerDeliveryAddress = "서울시 강남구 테헤란로 123";
 const buyerDeliveryAddressHash = keccak256(stringToBytes(buyerDeliveryAddress));
 const itemName = "나이키 알파플라이 3";
-const itemPrice = 10; // KRW
 const itemImageUrl = "https://static.nike.com/a/images/t_PDP_936_v1/f_auto,q_auto:eco/3d5aaf55-e2c6-4b73-b981-812c887010fd/AIR+ZOOM+ALPHAFLY+NEXT%25+3+PRM.png";
-const deliveryTrackingNumber = "6896724158888";
+
 const accID = 1146;
 const callbackGasLimit = 500000;
 
@@ -40,6 +39,7 @@ type TradeCreatedEventLog = Log & {
 // --- UI 컴포넌트 ---
 
 const SellerRegistrationView = ({ registerProduct }: { registerProduct: (product: Omit<Trade, 'id' | 'status' | 'buyer'>) => void }) => {
+    const [itemPrice, setItemPrice] = useState<number>(200000);
     const handleRegister = () => {
         registerProduct({
             productName: itemName,
@@ -52,9 +52,13 @@ const SellerRegistrationView = ({ registerProduct }: { registerProduct: (product
     return (
         <div className="p-4 flex flex-col h-full">
             <h2 className="font-bold text-lg mb-4 text-center">상품 등록</h2>
+            <CardHeader className="p-0 relative aspect-square">
+                <Image src={itemImageUrl} alt={itemName || ""} fill className="object-cover rounded-t-lg" sizes="(max-width: 280px) 100vw" />
+            </CardHeader>
             <div className="space-y-3 text-left flex-grow">
+                
                 <div><label className="text-xs font-medium text-gray-600">상품명</label><Input value={itemName} /></div>
-                <div><label className="text-xs font-medium text-gray-600">판매 금액 (KRW)</label><Input type="number" value={itemPrice} /></div>
+                <div><label className="text-xs font-medium text-gray-600">판매 금액 (KRW)</label><Input type="number" value={itemPrice} onChange={(e) => setItemPrice(Number(e.target.value))} /></div>
             </div>
             <Button onClick={handleRegister} className="w-full mt-4"><Upload className="mr-2 h-4 w-4" /> 상품 등록하기</Button>
         </div>
@@ -206,6 +210,7 @@ const SellerDashboardView = ({ trades }: { trades: Trade[] }) => (
 );
 
 const SellerTradeDetailView = ({ trade, updateTrade }: { trade: Trade, updateTrade: (trade: Partial<Trade> & { id: number }) => void }) => {
+    const [trackingNumber, setTrackingNumber] = useState<string>("송장번호 입력");
     const [isLoading, setIsLoading] = useState(false);
     const { refetch } = useReadContract({
         address: dteContractAddress,
@@ -217,7 +222,10 @@ const SellerTradeDetailView = ({ trade, updateTrade }: { trade: Trade, updateTra
     const publicClient = usePublicClient();
 
     const handleSubmit = async () => {
-        if (!deliveryTrackingNumber || !publicClient) return;
+        if (trackingNumber == "송장번호 입력" || !publicClient) {
+            toast.error("송장 번호를 입력해주세요.");
+            return;
+        }
         setIsLoading(true);
         toast.info("송장 정보 제출 중...", { description: "블록체인에 송장 정보를 기록합니다." });
         try {
@@ -225,13 +233,13 @@ const SellerTradeDetailView = ({ trade, updateTrade }: { trade: Trade, updateTra
                 address: dteContractAddress,
                 abi: dteAbi,
                 functionName: 'submitTrackingInfo',
-                args: [BigInt(trade.id), deliveryTrackingNumber, accID, callbackGasLimit],
+                args: [BigInt(trade.id), trackingNumber, accID, callbackGasLimit],
             });
 
             await publicClient.waitForTransactionReceipt({ hash: txHash });
             toast.success("송장 정보 제출 완료!");
             let updatedTrade = trade;
-            updatedTrade = { ...updatedTrade, status: TradeStatus.Shipping, trackingNumber: deliveryTrackingNumber };
+            updatedTrade = { ...updatedTrade, status: TradeStatus.Shipping, trackingNumber: trackingNumber };
             updateTrade(updatedTrade);
 
             // 오라클의 응답을 2초마다 확인하는 로직 시작
@@ -278,7 +286,7 @@ const SellerTradeDetailView = ({ trade, updateTrade }: { trade: Trade, updateTra
             </Card>
             <div className="mt-4 pt-4 border-t">
                 <label className="text-xs font-medium text-gray-600">송장 번호</label>
-                <Input value={deliveryTrackingNumber} />
+                <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} />
                 <Button onClick={handleSubmit} disabled={isLoading} className="w-full mt-2">
                     <Truck className="mr-2 h-4 w-4" />
                     {isLoading ? '제출 중...' : '송장번호 제출하기'}

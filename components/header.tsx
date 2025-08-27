@@ -10,9 +10,9 @@ export const Header = () => {
 
   const navLinks = [
     { href: "/#top", label: "서비스 소개" },
-    { href: "/#howitworks", label: "데모 슬라이더" },
-    { href: "#", label: "API 문서" },
-    { href: "https://orakl.network/", label: "연관 개발 문서" },
+    { href: "/demo", label: "데모 페이지" },
+    { href: "https://github.com/Jeongseup/2025-kaia-hackerthon-decentralized-trade-escrow/tree/main/contracts", label: "컨트랙트 정보" },
+    { href: "https://orakl.network/", label: "연동 오라클 서비스" },
   ];
 
   return (
